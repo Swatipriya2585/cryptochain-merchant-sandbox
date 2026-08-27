@@ -374,3 +374,19 @@ test('admin key lists transactions and resets mockDb', async () => {
     })
   ).expect(201);
 });
+
+test('public sandbox product page is connected for merchant testing', async () => {
+  const res = await request(app).get('/sandbox').expect(200);
+  assert.match(res.headers['content-type'], /html/);
+  assert.match(res.text, /Sandbox Console/);
+  assert.match(res.text, /Create Payment/);
+  assert.match(res.text, /mch_sandbox_001/);
+  assert.match(res.text, /merchant@sandbox.test/);
+  assert.match(res.text, /\/sandbox\/pay/);
+});
+
+test('sandbox console redirect does not require an API key', async () => {
+  const res = await request(app).get('/sandbox/console').expect(302);
+  assert.equal(res.headers.location, '/sandbox#console');
+});
+

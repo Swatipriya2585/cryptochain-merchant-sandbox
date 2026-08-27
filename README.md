@@ -35,6 +35,7 @@ sandbox/
   .env.example          SANDBOX_API_KEY, SANDBOX_ADMIN_KEY, PORT, ALLOWED_ORIGINS, CONFIRM_DELAY_MS, FAIL_RATE
   README.md             How to run, endpoints, sandbox API key
   public/
+    sandbox.html        GET /sandbox  (public merchant testing page + console)
     dashboard.html      GET /sandbox/dashboard?key=<SANDBOX_ADMIN_KEY>
   routes/
     payments.js         POST /sandbox/pay, GET /sandbox/status/:txId, GET /sandbox/transactions

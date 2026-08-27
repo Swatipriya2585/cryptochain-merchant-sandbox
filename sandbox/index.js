@@ -22,6 +22,8 @@ const DEFAULT_ORIGINS = [
   'https://www.cryptochain.in',
   'https://cryptochain.io',
   'https://www.cryptochain.io',
+  'https://cryptochainai.io',
+  'https://www.cryptochainai.io',
 ];
 
 function parseAllowedOrigins() {
@@ -91,9 +93,28 @@ app.get('/sandbox/health', (_req, res) => {
 });
 
 const dashboardFile = path.join(__dirname, 'public', 'dashboard.html');
+const sandboxPageFile = path.join(__dirname, 'public', 'sandbox.html');
+const noStore = { headers: { 'Cache-Control': 'no-store' } };
+
+app.get(['/sandbox', '/sandbox/'], (_req, res) => {
+  res.sendFile(sandboxPageFile, noStore);
+});
+
+app.get('/sandbox/console', (_req, res) => {
+  res.redirect(302, '/sandbox#console');
+});
+
+app.get('/sandbox/config.js', (_req, res) => {
+  const vite = process.env.VITE_SANDBOX_URL || '';
+  const next = process.env.NEXT_PUBLIC_SANDBOX_URL || vite;
+  res.type('application/javascript').send(
+    `window.VITE_SANDBOX_URL = ${JSON.stringify(vite)};\n` +
+      `window.NEXT_PUBLIC_SANDBOX_URL = ${JSON.stringify(next)};\n`
+  );
+});
 
 app.get('/sandbox/dashboard', requireAdminKey, (_req, res) => {
-  res.sendFile(dashboardFile, { headers: { 'Cache-Control': 'no-store' } });
+  res.sendFile(dashboardFile, noStore);
 });
 
 app.delete('/sandbox/reset', requireAdminKey, (_req, res) => {
@@ -139,6 +160,7 @@ if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`CryptoChain merchant sandbox listening on http://localhost:${PORT}`);
     console.log(`Health:     GET  http://localhost:${PORT}/health`);
+    console.log(`Sandbox:    GET  http://localhost:${PORT}/sandbox`);
     console.log(`Dashboard:  GET  http://localhost:${PORT}/sandbox/dashboard?key=${process.env.SANDBOX_ADMIN_KEY}`);
     console.log(`Pay:        POST http://localhost:${PORT}/sandbox/pay`);
     console.log(`State machine ticks every ${mockDb.STATE_MACHINE_INTERVAL_MS}ms`);

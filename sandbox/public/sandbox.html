@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sandbox — CryptoChain Merchant Testing</title>
+  <meta name="description" content="Test merchant payments in CryptoChain without real crypto." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script src="/sandbox/config.js"></script>
+  <style>
+    :root {
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --card: rgba(255,255,255,0.08);
+      --border: rgba(255,255,255,0.16);
+      --purple: #9333ea;
+      --teal: #14b8a6;
+      --pending: #eab308;
+      --confirming: #3b82f6;
+      --confirmed: #22c55e;
+      --failed: #ef4444;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, system-ui, sans-serif;
+      color: var(--text);
+      background: linear-gradient(135deg, #0f172a 0%, #3b0764 48%, #172554 100%);
+    }
+    a { color: inherit; }
+    header {
+      border-bottom: 1px solid var(--border);
+      background: rgba(0,0,0,0.28);
+      backdrop-filter: blur(16px);
+      position: sticky; top: 0; z-index: 20;
+    }
+    .bar, .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+    .bar { display: flex; align-items: center; justify-content: space-between; height: 64px; gap: 16px; }
+    .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 700; }
+    .logo { width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(135deg, #9333ea, #14b8a6); display: grid; place-items: center; font-size: 13px; }
+    nav { display: flex; align-items: center; gap: 18px; font-size: 14px; color: #cbd5e1; }
+    nav a { text-decoration: none; }
+    nav a:hover, nav a.active { color: #fff; }
+    .drop { position: relative; }
+    .drop > button {
+      background: none; border: 0; color: #fff; font: inherit; cursor: pointer; padding: 0;
+    }
+    .menu {
+      display: none; position: absolute; top: 28px; left: 0; min-width: 260px;
+      background: #0b1224; border: 1px solid var(--border); border-radius: 12px; padding: 8px;
+    }
+    .drop:hover .menu, .drop:focus-within .menu { display: block; }
+    .menu a { display: block; padding: 10px 12px; border-radius: 8px; text-decoration: none; }
+    .menu a:hover { background: rgba(255,255,255,0.06); }
+    .menu small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+    .cta {
+      background: var(--teal); color: #042f2e; font-weight: 700; border: 0; border-radius: 10px;
+      padding: 9px 14px; text-decoration: none; font-size: 13px;
+    }
+    .hero { text-align: center; padding: 72px 20px 40px; }
+    .kicker { letter-spacing: .18em; text-transform: uppercase; color: #c4b5fd; font-size: 12px; margin-bottom: 12px; }
+    h1 { font-size: clamp(32px, 5vw, 52px); margin: 0 0 16px; }
+    .lede { font-size: 18px; color: #cbd5e1; max-width: 640px; margin: 0 auto 28px; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      background: var(--purple); color: #fff; font-weight: 700; text-decoration: none;
+      border-radius: 12px; padding: 14px 22px; border: 0; cursor: pointer; font-size: 15px;
+    }
+    .btn:hover { filter: brightness(1.08); }
+    .btn.secondary { background: transparent; border: 1px solid var(--border); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin: 20px auto 48px; }
+    .card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+      padding: 18px; backdrop-filter: blur(12px);
+    }
+    .card h3 { margin: 0 0 8px; font-size: 18px; }
+    .card p { margin: 0; color: var(--muted); }
+    pre, .mono, code, textarea, #json-out, #status-json, #hook-json {
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+    }
+    pre {
+      background: #050814; border: 1px solid var(--border); border-radius: 14px;
+      padding: 18px; overflow: auto; color: #c4b5fd; font-size: 13px;
+    }
+    #console { max-width: 800px; margin: 0 auto 80px; }
+    .term {
+      background: rgba(5,8,20,0.72); border: 1px solid var(--border); border-radius: 18px;
+      overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+    }
+    .term-top {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 14px 16px; border-bottom: 1px solid var(--border); gap: 12px;
+    }
+    .pill { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; }
+    .dot { width: 8px; height: 8px; border-radius: 99px; background: #64748b; }
+    .dot.ok { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+    .dot.bad { background: #ef4444; box-shadow: 0 0 8px #ef4444; }
+    .merchant { font-size: 12px; color: var(--muted); }
+    .tabs { display: flex; border-bottom: 1px solid var(--border); }
+    .tabs button {
+      flex: 1; background: none; border: 0; color: var(--muted); padding: 12px;
+      cursor: pointer; font-weight: 600; border-bottom: 2px solid transparent;
+    }
+    .tabs button.on { color: #fff; border-bottom-color: var(--purple); }
+    .panel { display: none; padding: 18px; }
+    .panel.on { display: block; }
+    label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 6px; }
+    input, select, textarea {
+      width: 100%; background: #0b1224; border: 1px solid var(--border); color: #fff;
+      border-radius: 10px; padding: 10px 12px; font: inherit;
+    }
+    textarea { min-height: 72px; resize: vertical; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .badge { display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .pending { background: rgba(234,179,8,.2); color: var(--pending); }
+    .confirming { background: rgba(59,130,246,.2); color: var(--confirming); }
+    .confirmed { background: rgba(34,197,94,.2); color: var(--confirmed); }
+    .failed { background: rgba(239,68,68,.2); color: var(--failed); }
+    .stepper { display: flex; gap: 8px; margin: 16px 0; }
+    .step { flex: 1; text-align: center; font-size: 11px; color: var(--muted); }
+    .step i { display: block; height: 6px; border-radius: 99px; background: #1e293b; margin-bottom: 8px; }
+    .step.on i, .step.done i { background: var(--confirming); }
+    .step.done i { background: var(--confirmed); }
+    .step.fail i { background: var(--failed); }
+    .out {
+      background: #050814; border: 1px solid var(--border); border-radius: 12px;
+      padding: 12px; font-size: 12px; white-space: pre-wrap; word-break: break-all;
+      min-height: 88px; color: #bbf7d0; margin-top: 14px;
+    }
+    .err { color: var(--failed); font-size: 13px; margin-top: 10px; }
+    footer { text-align: center; color: var(--muted); font-size: 12px; padding: 0 20px 40px; }
+    @media (max-width: 700px) {
+      nav .hide { display: none; }
+      .row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="bar">
+      <a class="brand" href="/sandbox">
+        <div class="logo">CC</div>
+        CryptoChain
+      </a>
+      <nav>
+        <div class="drop">
+          <button type="button">Product ▾</button>
+          <div class="menu">
+            <a href="/sandbox">
+              Sandbox
+              <small>Test merchant payments without real crypto</small>
+            </a>
+            <a href="#sandbox-api-docs">
+              Merchant API
+              <small>Pay, status, and webhook simulation</small>
+            </a>
+          </div>
+        </div>
+        <a class="hide" href="#sandbox-api-docs">Developers</a>
+        <a class="active" href="/sandbox">Sandbox</a>
+        <a class="cta" href="#console">Launch Console</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero wrap">
+      <p class="kicker">Merchant sandbox</p>
+      <h1>Test merchant payments without real crypto</h1>
+      <p class="lede">
+        Connected to the CryptoChain merchant sandbox so you can create fake payments,
+        watch them confirm, and fire webhooks — as a test merchant user.
+      </p>
+      <a class="btn" href="#console">Launch Sandbox Console</a>
+    </section>
+
+    <section class="wrap grid">
+      <article class="card">
+        <h3>Fake transactions</h3>
+        <p>Create test payments as merchant <span class="mono">mch_sandbox_001</span> with a pending txHash.</p>
+      </article>
+      <article class="card">
+        <h3>Live status machine</h3>
+        <p>pending → confirming → confirmed (or failed). Same envelope as production.</p>
+      </article>
+      <article class="card">
+        <h3>Webhook simulation</h3>
+        <p>POST <span class="mono">payment.status_update</span> to your callback URL.</p>
+      </article>
+    </section>
+
+    <section class="wrap" id="sandbox-api-docs" style="margin-bottom:48px">
+      <div class="card">
+        <h3>Point your integration at this sandbox</h3>
+        <p style="margin-bottom:14px">Use the same merchant routes you will call in CryptoChain production.</p>
+        <pre><code>baseUrl:  http://localhost:4000
+          https://sandbox.cryptochain.in   // hosted
+
+Auth:     X-Api-Key: sk_test_sandbox_cryptochain_2026
+          or POST /sandbox/merchant/login
+          then Authorization: Bearer &lt;apiKey&gt;
+
+Tester:   merchant@sandbox.test / sandbox123
+          merchantId mch_sandbox_001</code></pre>
+      </div>
+    </section>
+
+    <section id="console">
+      <div class="term">
+        <div class="term-top">
+          <div>
+            <div style="font-weight:700">Sandbox Console</div>
+            <div class="merchant" id="merchant-line">Connecting merchant session…</div>
+          </div>
+          <div class="pill"><span class="dot" id="health-dot"></span><span id="health-label">Checking…</span></div>
+        </div>
+        <div class="tabs">
+          <button type="button" class="on" data-tab="pay">Create Payment</button>
+          <button type="button" data-tab="status">Check Status</button>
+          <button type="button" data-tab="hook">Webhook Test</button>
+        </div>
+
+        <div class="panel on" id="panel-pay">
+          <div class="row">
+            <div>
+              <label for="amount">Amount</label>
+              <input id="amount" type="number" min="0.01" step="0.01" value="25.5" />
+            </div>
+            <div>
+              <label for="currency">Currency</label>
+              <select id="currency">
+                <option value="USDT">USDT</option>
+                <option value="BTC">BTC</option>
+                <option value="ETH">ETH</option>
+              </select>
+            </div>
+          </div>
+          <label for="orderId">Order ID</label>
+          <input id="orderId" />
+          <p class="err" id="pay-err" hidden></p>
+          <button class="btn" type="button" id="pay-btn" style="margin-top:16px">Create payment</button>
+          <div class="out" id="json-out">Awaiting a test payment…</div>
+        </div>
+
+        <div class="panel" id="panel-status">
+          <label for="status-tx">txId</label>
+          <input id="status-tx" placeholder="tx_…" />
+          <p class="err" id="status-err" hidden></p>
+          <button class="btn" type="button" id="status-btn" style="margin-top:16px">Poll status</button>
+          <div style="margin-top:14px">Status: <span class="badge pending" id="status-badge">—</span></div>
+          <div class="stepper">
+            <div class="step" id="step-pending"><i></i>Pending</div>
+            <div class="step" id="step-confirming"><i></i>Confirming</div>
+            <div class="step" id="step-confirmed"><i></i>Confirmed</div>
+          </div>
+          <div class="out" id="status-json">Polling every 3s once a txId is set.</div>
+        </div>
+
+        <div class="panel" id="panel-hook">
+          <label for="hook-tx">txId</label>
+          <input id="hook-tx" placeholder="tx_…" />
+          <label for="hook-url">Callback URL</label>
+          <input id="hook-url" placeholder="https://merchant.example/webhooks/cryptochain" />
+          <p class="err" id="hook-err" hidden></p>
+          <button class="btn" type="button" id="hook-btn" style="margin-top:16px">Send webhook</button>
+          <div class="out" id="hook-json">Simulate POST payment.status_update to your callback.</div>
+        </div>
+      </div>
+    </section>
+  </main>
+  <footer>Internal merchant testing only. No real crypto leaves the sandbox.</footer>
+
+  <script>
+    const MERCHANT_EMAIL = "merchant@sandbox.test";
+    const MERCHANT_PASSWORD = "sandbox123";
+    const FALLBACK_KEY = "sk_test_sandbox_cryptochain_2026";
+    const MERCHANT_ID = "mch_sandbox_001";
+
+    function sandboxBase() {
+      const q = new URLSearchParams(location.search).get("baseUrl");
+      const fromEnv = (window.VITE_SANDBOX_URL || window.NEXT_PUBLIC_SANDBOX_URL || "").replace(/\/$/, "");
+      if (q) return q.replace(/\/$/, "");
+      if (fromEnv) return fromEnv;
+      if (location.protocol.startsWith("http") && location.pathname.indexOf("/sandbox") === 0) {
+        return location.origin;
+      }
+      return "http://localhost:4000";
+    }
+
+    const BASE = sandboxBase();
+    let apiKey = FALLBACK_KEY;
+    let pollTimer = null;
+
+    function $(id) { return document.getElementById(id); }
+    function showErr(id, msg) {
+      const el = $(id);
+      el.hidden = !msg;
+      el.textContent = msg || "";
+    }
+    function pretty(value) {
+      try { return JSON.stringify(value, null, 2); } catch { return String(value); }
+    }
+    function headers(json) {
+      const h = { "x-api-key": apiKey, Authorization: "Bearer " + apiKey };
+      if (json) h["Content-Type"] = "application/json";
+      return h;
+    }
+    function newOrderId() {
+      return "ord_" + Math.random().toString(36).slice(2, 10);
+    }
+
+    async function pingHealth() {
+      try {
+        const res = await fetch(BASE + "/sandbox/health");
+        const body = await res.json().catch(function () { return {}; });
+        const ok = res.ok && (body.status === "ok" || (body.data && body.data.status === "ok") || body.success);
+        $("health-dot").className = "dot " + (ok ? "ok" : "bad");
+        $("health-label").textContent = ok ? "Connected" : "Sandbox Offline";
+        return ok;
+      } catch (err) {
+        $("health-dot").className = "dot bad";
+        $("health-label").textContent = "Sandbox Offline";
+        return false;
+      }
+    }
+
+    async function connectMerchant() {
+      try {
+        const res = await fetch(BASE + "/sandbox/merchant/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: MERCHANT_EMAIL, password: MERCHANT_PASSWORD })
+        });
+        const body = await res.json();
+        if (!res.ok || !body.success) throw new Error(body.message || "Login failed");
+        apiKey = body.data.apiKey || FALLBACK_KEY;
+        $("merchant-line").textContent =
+          "Testing as " + (body.data.name || "Sandbox Merchant") +
+          " · " + body.data.merchantId +
+          " · sandboxMode";
+      } catch (err) {
+        apiKey = FALLBACK_KEY;
+        $("merchant-line").textContent =
+          "Using demo merchant " + MERCHANT_ID + " · " + err.message;
+      }
+    }
+
+    document.querySelectorAll(".tabs button").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        document.querySelectorAll(".tabs button").forEach(function (b) { b.classList.remove("on"); });
+        document.querySelectorAll(".panel").forEach(function (p) { p.classList.remove("on"); });
+        btn.classList.add("on");
+        $("panel-" + btn.getAttribute("data-tab")).classList.add("on");
+      });
+    });
+
+    $("orderId").value = newOrderId();
+
+    $("pay-btn").addEventListener("click", async function () {
+      showErr("pay-err", "");
+      const amount = Number($("amount").value);
+      const currency = $("currency").value;
+      const orderId = $("orderId").value.trim() || newOrderId();
+      $("orderId").value = orderId;
+      try {
+        const res = await fetch(BASE + "/sandbox/pay", {
+          method: "POST",
+          headers: headers(true),
+          body: JSON.stringify({ amount: amount, currency: currency, merchantId: MERCHANT_ID, orderId: orderId })
+        });
+        const body = await res.json();
+        $("json-out").textContent = pretty({
+          txId: body.data && body.data.txId,
+          txHash: body.data && body.data.txHash,
+          status: body.data && body.data.status,
+          amount: body.data && body.data.amount,
+          currency: body.data && body.data.currency,
+          merchantId: body.data && body.data.merchantId,
+          raw: body
+        });
+        if (!res.ok) showErr("pay-err", body.message || body.error || ("HTTP " + res.status));
+        if (body.data && body.data.txId) {
+          $("status-tx").value = body.data.txId;
+          $("hook-tx").value = body.data.txId;
+        }
+      } catch (err) {
+        showErr("pay-err", err.message);
+      }
+    });
+
+    function paintStatus(tx) {
+      const status = (tx && tx.status) || "pending";
+      const badge = $("status-badge");
+      badge.className = "badge " + status;
+      badge.textContent = status;
+      ["pending", "confirming", "confirmed"].forEach(function (name) {
+        $("step-" + name).className = "step";
+      });
+      if (status === "failed") {
+        $("step-pending").className = "step done";
+        $("step-confirming").className = "step fail";
+        $("step-confirmed").className = "step fail";
+      } else if (status === "pending") {
+        $("step-pending").className = "step on";
+      } else if (status === "confirming") {
+        $("step-pending").className = "step done";
+        $("step-confirming").className = "step on";
+      } else if (status === "confirmed") {
+        $("step-pending").className = "step done";
+        $("step-confirming").className = "step done";
+        $("step-confirmed").className = "step done";
+      }
+    }
+
+    async function pollStatus() {
+      const txId = $("status-tx").value.trim();
+      if (!txId) return;
+      showErr("status-err", "");
+      try {
+        const res = await fetch(BASE + "/sandbox/status/" + encodeURIComponent(txId), { headers: headers() });
+        const body = await res.json();
+        $("status-json").textContent = pretty(body);
+        if (!res.ok) {
+          showErr("status-err", body.message || body.error || ("HTTP " + res.status));
+          return;
+        }
+        paintStatus(body.data);
+      } catch (err) {
+        showErr("status-err", err.message);
+      }
+    }
+
+    $("status-btn").addEventListener("click", function () {
+      pollStatus();
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = setInterval(pollStatus, 3000);
+    });
+
+    $("hook-btn").addEventListener("click", async function () {
+      showErr("hook-err", "");
+      const txId = $("hook-tx").value.trim();
+      const callbackUrl = $("hook-url").value.trim();
+      if (!txId || !callbackUrl) {
+        showErr("hook-err", "txId and callback URL are required");
+        return;
+      }
+      try {
+        const res = await fetch(BASE + "/sandbox/webhook/simulate", {
+          method: "POST",
+          headers: headers(true),
+          body: JSON.stringify({ txId: txId, callbackUrl: callbackUrl })
+        });
+        const body = await res.json();
+        $("hook-json").textContent = pretty(body);
+        if (!res.ok) showErr("hook-err", body.message || body.error || ("HTTP " + res.status));
+      } catch (err) {
+        showErr("hook-err", err.message);
+      }
+    });
+
+    pingHealth();
+    connectMerchant();
+    setInterval(pingHealth, 10000);
+  </script>
+</body>
+</html>

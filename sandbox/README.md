@@ -90,6 +90,18 @@ Progress is driven by the in-memory state machine in `data/mockDb.js`. A backgro
 
 About `FAIL_RATE` (default 10%) of payments go `confirming` → `failed` instead of `confirmed`. `GET /sandbox/status/:txId` also applies due transitions immediately so polling does not wait for the next 2s tick.
 
+### `GET /sandbox`
+
+Public merchant testing page (no API key). Served with `res.sendFile`. Product nav includes **Sandbox**, and the embedded console logs in as `merchant@sandbox.test` then calls:
+
+- `POST /sandbox/merchant/login`
+- `POST /sandbox/pay`
+- `GET /sandbox/status/:txId`
+- `POST /sandbox/webhook/simulate`
+- `GET /sandbox/health` (green Connected / red Sandbox Offline)
+
+`GET /sandbox/console` redirects to `/sandbox#console`.
+
 ### `GET /sandbox/dashboard?key=<SANDBOX_ADMIN_KEY>`
 
 Internal HTML dashboard (no framework). Served with `res.sendFile`. Guarded by `?key=` matching `SANDBOX_ADMIN_KEY`. Without the key the page returns HTML `401`.
