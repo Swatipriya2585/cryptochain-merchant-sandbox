@@ -4,6 +4,7 @@ const http = require('node:http');
 const request = require('supertest');
 
 process.env.SANDBOX_API_KEY = 'sk_test_sandbox_cryptochain_2026';
+process.env.SANDBOX_ADMIN_KEY = 'sandbox_admin_test_key';
 process.env.CONFIRM_DELAY_MS = '40';
 process.env.FAIL_RATE = '0';
 process.env.PORT = '0';
@@ -12,6 +13,7 @@ const app = require('../sandbox');
 const mockDb = require('../sandbox/data/mockDb');
 
 const API_KEY = process.env.SANDBOX_API_KEY;
+const ADMIN_KEY = process.env.SANDBOX_ADMIN_KEY;
 
 function auth(req) {
   return req.set('x-api-key', API_KEY);
@@ -320,7 +322,55 @@ test('lists all transactions for the dashboard', async () => {
   ).expect(201);
 
   const res = await auth(request(app).get('/sandbox/transactions')).expect(200);
-  assert.equal(res.body.success, true);
-  assert.ok(res.body.data.length >= 2);
-  assert.ok(res.body.data.every((tx) => tx.txId && tx.status && tx.orderId));
+  assert.equal(Array.isArray(res.body), true);
+  assert.ok(res.body.length >= 2);
+  assert.ok(res.body.every((tx) => tx.txId && tx.status && tx.orderId));
+});
+
+test('dashboard requires the sandbox admin key', async () => {
+  const denied = await request(app).get('/sandbox/dashboard').expect(401);
+  assert.match(denied.text, /Unauthorized/i);
+
+  const wrong = await request(app).get('/sandbox/dashboard').query({ key: 'nope' }).expect(401);
+  assert.match(wrong.text, /Unauthorized/i);
+
+  const ok = await request(app).get('/sandbox/dashboard').query({ key: ADMIN_KEY }).expect(200);
+  assert.match(ok.headers['content-type'], /html/);
+  assert.match(ok.text, /Sandbox Dashboard/);
+  assert.match(ok.text, /Reset All/);
+  assert.match(ok.text, /count-pending/);
+});
+
+test('admin key lists transactions and resets mockDb', async () => {
+  await auth(
+    request(app).post('/sandbox/pay').send({
+      amount: 9,
+      currency: 'USDC',
+      merchantId: 'mch_sandbox_001',
+      orderId: 'ord_reset_1',
+    })
+  ).expect(201);
+
+  const listed = await request(app).get('/sandbox/transactions').query({ key: ADMIN_KEY }).expect(200);
+  assert.equal(Array.isArray(listed.body), true);
+  assert.equal(listed.body.length, 1);
+  assert.equal(listed.body[0].orderId, 'ord_reset_1');
+
+  const denied = await request(app).delete('/sandbox/reset').expect(401);
+  assert.equal(denied.body.success, false);
+
+  const reset = await request(app).delete('/sandbox/reset').query({ key: ADMIN_KEY }).expect(200);
+  assert.deepEqual(reset.body, { cleared: true });
+
+  const emptied = await request(app).get('/sandbox/transactions').query({ key: ADMIN_KEY }).expect(200);
+  assert.deepEqual(emptied.body, []);
+
+  await auth(
+    request(app).post('/sandbox/pay').send({
+      amount: 3,
+      currency: 'USDC',
+      merchantId: 'mch_sandbox_001',
+      orderId: 'ord_after_reset',
+    })
+  ).expect(201);
 });

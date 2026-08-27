@@ -67,7 +67,7 @@ router.get('/transactions', (req, res) => {
     .filter((tx) => !merchantId || tx.merchantId === merchantId)
     .map(paymentEnvelope);
 
-  return res.status(200).json(success(transactions, 'Transactions retrieved'));
+  return res.status(200).json(transactions);
 });
 
 module.exports = router;

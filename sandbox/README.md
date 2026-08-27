@@ -48,8 +48,9 @@ Copy `sandbox/.env.example`. Variables:
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `SANDBOX_API_KEY` | `sk_test_sandbox_cryptochain_2026` | Static sandbox API key |
+| `SANDBOX_ADMIN_KEY` | `sandbox_admin_dev_key` | Query-param key for the internal dashboard and reset route |
 | `PORT` | `4000` | HTTP port |
-| `ALLOWED_ORIGINS` | localhost + `https://cryptochain.io` | CORS allowlist (comma-separated). Any `localhost` / `127.0.0.1` origin is also allowed. |
+| `ALLOWED_ORIGINS` | localhost + cryptochain.in / .io | CORS allowlist (comma-separated). Any `localhost` / `127.0.0.1` origin is also allowed. Defaults are always included. |
 | `CONFIRM_DELAY_MS` | `8000` | Delay between `pending → confirming` and `confirming → confirmed` |
 | `FAIL_RATE` | `0.1` | Probability a transaction ends as `failed` instead of `confirmed` |
 
@@ -89,9 +90,29 @@ Progress is driven by the in-memory state machine in `data/mockDb.js`. A backgro
 
 About `FAIL_RATE` (default 10%) of payments go `confirming` → `failed` instead of `confirmed`. `GET /sandbox/status/:txId` also applies due transitions immediately so polling does not wait for the next 2s tick.
 
+### `GET /sandbox/dashboard?key=<SANDBOX_ADMIN_KEY>`
+
+Internal HTML dashboard (no framework). Served with `res.sendFile`. Guarded by `?key=` matching `SANDBOX_ADMIN_KEY`. Without the key the page returns HTML `401`.
+
+The page lists every transaction (`txId`, `orderId`, `amount`, `currency`, `status`, age), shows pending/confirming/confirmed/failed counts, auto-refreshes every 5 seconds via `GET /sandbox/transactions`, and has a **Reset All** button that calls `DELETE /sandbox/reset`.
+
+```
+http://localhost:4000/sandbox/dashboard?key=sandbox_admin_dev_key
+```
+
 ### `GET /sandbox/transactions`
 
-Dashboard listing of every sandbox transaction (newest first). Optional `?merchantId=` filter.
+JSON array of every sandbox transaction (newest first). Optional `?merchantId=` filter. Requires a merchant API key **or** `?key=<SANDBOX_ADMIN_KEY>`.
+
+```json
+[
+  { "txId": "tx_...", "orderId": "ord_1001", "amount": 25.5, "currency": "USDC", "status": "pending", "createdAt": "2026-08-27T13:00:00.000Z" }
+]
+```
+
+### `DELETE /sandbox/reset?key=<SANDBOX_ADMIN_KEY>`
+
+Clears all transactions and sessions (then re-seeds the demo merchant). Returns `{ "cleared": true }`.
 
 ### `POST /sandbox/webhook/simulate`
 

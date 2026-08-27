@@ -32,10 +32,12 @@ curl -s -X POST http://localhost:4000/sandbox/pay \
 ```
 sandbox/
   index.js              Express entry point (CORS for localhost + website domain)
-  .env.example          SANDBOX_API_KEY, PORT, ALLOWED_ORIGINS, CONFIRM_DELAY_MS, FAIL_RATE
+  .env.example          SANDBOX_API_KEY, SANDBOX_ADMIN_KEY, PORT, ALLOWED_ORIGINS, CONFIRM_DELAY_MS, FAIL_RATE
   README.md             How to run, endpoints, sandbox API key
+  public/
+    dashboard.html      GET /sandbox/dashboard?key=<SANDBOX_ADMIN_KEY>
   routes/
-    payments.js         POST /sandbox/pay, GET /sandbox/status/:txId
+    payments.js         POST /sandbox/pay, GET /sandbox/status/:txId, GET /sandbox/transactions
     webhook.js          POST /sandbox/webhook/simulate
     merchant.js         GET /sandbox/merchant/profile, POST /sandbox/merchant/login
   middleware/
