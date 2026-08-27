@@ -17,27 +17,29 @@ npm run dev    # restart on file changes
 npm test       # API tests
 ```
 
-## Sandbox API key
+## Sandbox auth
+
+Log in (no API key required), then send the returned `apiKey` as a Bearer token:
 
 ```
-sk_test_sandbox_cryptochain_2026
+Authorization: Bearer <apiKey>
 ```
 
-Send it on every `/sandbox/*` request except `/sandbox/health`:
+The static key is also pre-seeded on the demo merchant so payment routes still accept:
 
 ```
 x-api-key: sk_test_sandbox_cryptochain_2026
 ```
-
-`Authorization: Bearer sk_test_sandbox_cryptochain_2026` is also accepted. After login, `Authorization: Bearer <session token>` works as well.
 
 ## Demo merchant
 
 | Field | Value |
 | --- | --- |
 | merchantId | `mch_sandbox_001` |
-| email | `merchant@cryptochain.io` |
+| email | `merchant@sandbox.test` |
 | password | `sandbox123` |
+| name | `Sandbox Merchant` |
+| businessName | `Sandbox Test Store` |
 
 ## Environment
 
@@ -111,18 +113,51 @@ The outbound webhook is HMAC-SHA256 signed with `SANDBOX_API_KEY`:
 
 ### `POST /sandbox/merchant/login`
 
+No auth header required. Any non-empty `{ email, password }` succeeds in sandbox. The pre-seeded tester account is `merchant@sandbox.test` / `sandbox123`.
+
 ```json
 {
-  "email": "merchant@cryptochain.io",
+  "email": "merchant@sandbox.test",
   "password": "sandbox123"
 }
 ```
 
-Returns a session token and merchant profile.
+```json
+{
+  "success": true,
+  "data": {
+    "merchantId": "mch_sandbox_001",
+    "apiKey": "sk_sandbox_...",
+    "name": "Sandbox Merchant",
+    "businessName": "Sandbox Test Store",
+    "sandboxMode": true
+  },
+  "message": "Login successful",
+  "timestamp": "2026-08-27T13:00:00.000Z"
+}
+```
+
+The session is stored in `mockDb.merchantSessions`.
 
 ### `GET /sandbox/merchant/profile`
 
-Returns the demo merchant profile. Optional `merchantId` query param or `x-merchant-id` header. If `Authorization: Bearer <session token>` is sent, that merchant is returned.
+Header: `Authorization: Bearer <apiKey>`
+
+```json
+{
+  "success": true,
+  "data": {
+    "merchantId": "mch_sandbox_001",
+    "name": "Sandbox Merchant",
+    "businessName": "Sandbox Test Store",
+    "balance": 12500.75,
+    "txCount": 0,
+    "sandboxMode": true
+  },
+  "message": "Merchant profile retrieved",
+  "timestamp": "2026-08-27T13:00:00.000Z"
+}
+```
 
 ## Response shape
 
@@ -171,7 +206,7 @@ Error:
 {
   "success": false,
   "error": "Unauthorized",
-  "message": "Invalid or missing sandbox API key. Pass it as x-api-key.",
+  "message": "Invalid or missing merchant API key. Pass Authorization: Bearer <apiKey>.",
   "timestamp": "2026-08-27T13:00:00.000Z"
 }
 ```

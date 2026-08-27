@@ -2,6 +2,7 @@ const {
   generateTxId,
   generateTxHash,
   generateSessionToken,
+  generateApiKey,
   getNetwork,
   getRequiredConfirmations,
   confirmationsForStatus,
@@ -11,12 +12,16 @@ const {
 
 const DEFAULT_MERCHANT = {
   id: 'mch_sandbox_001',
-  name: 'CryptoChain Demo Merchant',
+  merchantId: 'mch_sandbox_001',
+  name: 'Sandbox Merchant',
+  businessName: 'Sandbox Test Store',
   description: 'Sandbox merchant used to simulate CryptoChain payment flows',
   logo: null,
   website: 'https://cryptochain.io',
-  email: 'merchant@cryptochain.io',
+  email: 'merchant@sandbox.test',
   password: 'sandbox123',
+  balance: 12500.75,
+  sandboxMode: true,
   walletAddress: '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU',
   acceptedCryptocurrencies: ['SOL', 'USDC', 'USDT', 'ETH', 'BTC'],
   settings: {
@@ -60,23 +65,31 @@ const store = {
   transactions: new Map(),
   merchants: new Map(),
   sessions: new Map(),
+  merchantSessions: new Map(),
 };
 
 const statusListeners = [];
 let stateMachineTimer = null;
+
+function nowIso() {
+  return new Date().toISOString();
+}
 
 function seed() {
   store.merchants.set(DEFAULT_MERCHANT.id, {
     ...DEFAULT_MERCHANT,
     analytics: { ...DEFAULT_MERCHANT.analytics, revenueByCryptocurrency: {} },
   });
+
+  const staticKey = process.env.SANDBOX_API_KEY || 'sk_test_sandbox_cryptochain_2026';
+  store.merchantSessions.set(staticKey, {
+    apiKey: staticKey,
+    merchantId: DEFAULT_MERCHANT.id,
+    createdAt: nowIso(),
+  });
 }
 
 seed();
-
-function nowIso() {
-  return new Date().toISOString();
-}
 
 function clonePublic(tx) {
   if (!tx) return null;
@@ -208,10 +221,76 @@ function publicMerchant(merchant) {
   const { password, ...safe } = merchant;
   return {
     ...safe,
+    merchantId: merchant.merchantId || merchant.id,
     transactions: getAllTransactions()
       .filter((tx) => tx.merchantId === merchant.id)
       .slice(0, 10),
   };
+}
+
+function toAuthMerchant(merchant) {
+  if (!merchant) return null;
+  const { password, ...safe } = merchant;
+  return {
+    ...safe,
+    merchantId: merchant.merchantId || merchant.id,
+  };
+}
+
+function createMerchant({ email, password, name, businessName } = {}) {
+  const id = `mch_${generateSessionToken().slice(4, 16)}`;
+  const displayName = name || String(email).split('@')[0] || 'Sandbox Merchant';
+  const merchant = {
+    id,
+    merchantId: id,
+    name: displayName,
+    businessName: businessName || `${displayName} Store`,
+    description: 'Sandbox merchant created at login',
+    logo: null,
+    website: null,
+    email: String(email).trim().toLowerCase(),
+    password: String(password || ''),
+    balance: 10000,
+    sandboxMode: true,
+    walletAddress: DEFAULT_MERCHANT.walletAddress,
+    acceptedCryptocurrencies: [...DEFAULT_MERCHANT.acceptedCryptocurrencies],
+    settings: JSON.parse(JSON.stringify(DEFAULT_MERCHANT.settings)),
+    analytics: {
+      totalTransactions: 0,
+      totalVolume: 0,
+      averageTransactionValue: 0,
+      mostPopularCryptocurrency: 'SOL',
+      conversionRate: 1,
+      customerCount: 1,
+      revenueByCryptocurrency: {},
+    },
+    createdAt: nowIso(),
+  };
+  store.merchants.set(merchant.id, merchant);
+  return merchant;
+}
+
+function upsertSandboxMerchant({ email, password, name, businessName } = {}) {
+  const existing = getMerchantByEmail(email);
+  if (existing) return existing;
+  return createMerchant({ email, password, name, businessName });
+}
+
+function createMerchantSession(merchantId, apiKey) {
+  const key = apiKey || generateApiKey();
+  const session = {
+    apiKey: key,
+    merchantId,
+    createdAt: nowIso(),
+  };
+  store.merchantSessions.set(key, session);
+  store.sessions.set(key, { token: key, merchantId, createdAt: session.createdAt });
+  return session;
+}
+
+function getMerchantSession(apiKey) {
+  if (!apiKey) return null;
+  return store.merchantSessions.get(apiKey) || store.sessions.get(apiKey) || null;
 }
 
 function createTransaction(data = {}) {
@@ -359,18 +438,18 @@ function getMerchantByEmail(email) {
 }
 
 function createSession(merchantId) {
-  const token = generateSessionToken();
-  const session = {
-    token,
-    merchantId,
-    createdAt: nowIso(),
-  };
-  store.sessions.set(token, session);
-  return session;
+  const session = createMerchantSession(merchantId);
+  return { token: session.apiKey, merchantId: session.merchantId, createdAt: session.createdAt };
 }
 
 function getSession(token) {
-  return store.sessions.get(token) || null;
+  const session = getMerchantSession(token);
+  if (!session) return null;
+  return {
+    token: session.apiKey || session.token,
+    merchantId: session.merchantId,
+    createdAt: session.createdAt,
+  };
 }
 
 function updateAnalytics(merchantId, tx) {
@@ -391,6 +470,7 @@ function reset() {
   store.transactions.clear();
   store.merchants.clear();
   store.sessions.clear();
+  store.merchantSessions.clear();
   seed();
 }
 
@@ -414,6 +494,11 @@ module.exports = {
   getMerchant,
   getMerchantByEmail,
   publicMerchant,
+  toAuthMerchant,
+  createMerchant,
+  upsertSandboxMerchant,
+  createMerchantSession,
+  getMerchantSession,
   createSession,
   getSession,
   reset,

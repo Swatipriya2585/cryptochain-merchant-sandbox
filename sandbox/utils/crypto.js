@@ -54,6 +54,10 @@ function generateSessionToken() {
   return `sbx_${crypto.randomBytes(24).toString('hex')}`;
 }
 
+function generateApiKey() {
+  return `sk_sandbox_${crypto.randomBytes(24).toString('hex')}`;
+}
+
 function signWebhookPayload(payload, secret) {
   const body = typeof payload === 'string' ? payload : JSON.stringify(payload);
   return crypto.createHmac('sha256', secret).update(body).digest('hex');
@@ -79,6 +83,7 @@ module.exports = {
   generateTxId,
   generateTxHash,
   generateSessionToken,
+  generateApiKey,
   signWebhookPayload,
   confirmationsForStatus,
   nextStatus,

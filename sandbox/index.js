@@ -5,7 +5,7 @@ require('dotenv').config({ path: path.join(__dirname, '.env') });
 const express = require('express');
 const cors = require('cors');
 const { requestLogger } = require('./middleware/logger');
-const { requireApiKey } = require('./middleware/auth');
+const { requireAuth } = require('./middleware/auth');
 const paymentsRouter = require('./routes/payments');
 const webhookRouter = require('./routes/webhook');
 const merchantRouter = require('./routes/merchant');
@@ -85,10 +85,10 @@ app.get('/sandbox/health', (_req, res) => {
   });
 });
 
-app.use('/sandbox', requireApiKey);
+app.use('/sandbox/merchant', merchantRouter);
+app.use('/sandbox', requireAuth);
 app.use('/sandbox', paymentsRouter);
 app.use('/sandbox', webhookRouter);
-app.use('/sandbox/merchant', merchantRouter);
 
 app.use((req, res) => {
   res.status(404).json({

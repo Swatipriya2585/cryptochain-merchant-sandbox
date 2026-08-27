@@ -161,38 +161,60 @@ test('status can be fetched by txHash', async () => {
 });
 
 test('merchant login and profile', async () => {
-  const login = await auth(
-    request(app).post('/sandbox/merchant/login').send({
-      email: 'merchant@cryptochain.io',
+  const login = await request(app)
+    .post('/sandbox/merchant/login')
+    .send({
+      email: 'merchant@sandbox.test',
       password: 'sandbox123',
     })
-  ).expect(200);
+    .expect(200);
 
   assert.equal(login.body.success, true);
-  assert.ok(login.body.data.token.startsWith('sbx_'));
-  assert.equal(login.body.data.merchant.id, 'mch_sandbox_001');
-  assert.equal(login.body.data.merchant.email, 'merchant@cryptochain.io');
-  assert.equal(login.body.data.merchant.password, undefined);
+  assert.equal(login.body.data.merchantId, 'mch_sandbox_001');
+  assert.equal(login.body.data.name, 'Sandbox Merchant');
+  assert.equal(login.body.data.businessName, 'Sandbox Test Store');
+  assert.equal(login.body.data.sandboxMode, true);
+  assert.ok(login.body.data.apiKey);
 
   const profile = await request(app)
     .get('/sandbox/merchant/profile')
-    .set('Authorization', `Bearer ${login.body.data.token}`)
+    .set('Authorization', `Bearer ${login.body.data.apiKey}`)
     .expect(200);
 
-  assert.equal(profile.body.data.id, 'mch_sandbox_001');
-  assert.ok(Array.isArray(profile.body.data.acceptedCryptocurrencies));
-  assert.ok(profile.body.data.settings);
-  assert.ok(profile.body.data.analytics);
+  assert.equal(profile.body.data.merchantId, 'mch_sandbox_001');
+  assert.equal(profile.body.data.name, 'Sandbox Merchant');
+  assert.equal(profile.body.data.businessName, 'Sandbox Test Store');
+  assert.equal(profile.body.data.sandboxMode, true);
+  assert.equal(typeof profile.body.data.balance, 'number');
+  assert.equal(typeof profile.body.data.txCount, 'number');
 });
 
-test('merchant login rejects bad credentials', async () => {
-  const res = await auth(
-    request(app).post('/sandbox/merchant/login').send({
-      email: 'merchant@cryptochain.io',
-      password: 'wrong',
+test('merchant login accepts any non-empty sandbox credentials', async () => {
+  const login = await request(app)
+    .post('/sandbox/merchant/login')
+    .send({
+      email: 'anyone@example.com',
+      password: 'anything',
     })
-  ).expect(401);
+    .expect(200);
+
+  assert.equal(login.body.success, true);
+  assert.equal(login.body.data.sandboxMode, true);
+  assert.ok(login.body.data.merchantId);
+  assert.ok(login.body.data.apiKey);
+  assert.ok(login.body.data.name);
+  assert.ok(login.body.data.businessName);
+});
+
+test('merchant login rejects empty credentials', async () => {
+  const res = await request(app).post('/sandbox/merchant/login').send({ email: '', password: '' }).expect(400);
   assert.equal(res.body.success, false);
+});
+
+test('merchant profile requires a Bearer session', async () => {
+  const res = await request(app).get('/sandbox/merchant/profile').expect(401);
+  assert.equal(res.body.success, false);
+  assert.equal(res.body.error, 'Unauthorized');
 });
 
 test('webhook simulate posts signed status to the merchant callback URL', async () => {
