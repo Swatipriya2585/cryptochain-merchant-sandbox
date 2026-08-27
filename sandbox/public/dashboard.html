@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CryptoChain Sandbox Dashboard</title>
+  <style>
+    :root {
+      --bg: #070b18;
+      --card: rgba(255, 255, 255, 0.08);
+      --border: rgba(255, 255, 255, 0.16);
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --pending: #eab308;
+      --confirming: #3b82f6;
+      --confirmed: #22c55e;
+      --failed: #ef4444;
+      --purple: #9333ea;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, system-ui, sans-serif;
+      color: var(--text);
+      background: linear-gradient(135deg, #0f172a 0%, #3b0764 50%, #172554 100%);
+    }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 20px 64px; }
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    .sub { color: var(--muted); margin: 0; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 24px 0 20px; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+      backdrop-filter: blur(12px);
+    }
+    .card .label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+    .card .count { font-size: 32px; font-weight: 700; margin-top: 8px; font-family: "JetBrains Mono", ui-monospace, monospace; }
+    .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 12px; }
+    button {
+      background: var(--purple);
+      color: white;
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 16px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover { filter: brightness(1.08); }
+    table { width: 100%; border-collapse: collapse; overflow: hidden; }
+    th, td { text-align: left; padding: 10px 12px; font-size: 13px; }
+    th { color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--border); }
+    td { border-bottom: 1px solid rgba(255,255,255,0.06); font-family: "JetBrains Mono", ui-monospace, monospace; }
+    .badge { display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .pending { background: rgba(234,179,8,0.2); color: var(--pending); }
+    .confirming { background: rgba(59,130,246,0.2); color: var(--confirming); }
+    .confirmed { background: rgba(34,197,94,0.2); color: var(--confirmed); }
+    .failed { background: rgba(239,68,68,0.2); color: var(--failed); }
+    .error { color: var(--failed); margin: 12px 0; }
+    .mono { font-family: "JetBrains Mono", ui-monospace, monospace; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Sandbox Dashboard</h1>
+    <p class="sub">Internal testing view of mock payments. Auto-refreshes every 5 seconds.</p>
+    <div class="cards">
+      <div class="card"><div class="label">Pending</div><div class="count" id="count-pending">0</div></div>
+      <div class="card"><div class="label">Confirming</div><div class="count" id="count-confirming">0</div></div>
+      <div class="card"><div class="label">Confirmed</div><div class="count" id="count-confirmed">0</div></div>
+      <div class="card"><div class="label">Failed</div><div class="count" id="count-failed">0</div></div>
+    </div>
+    <div class="toolbar">
+      <div class="sub" id="meta">Loading…</div>
+      <button type="button" id="reset">Reset All</button>
+    </div>
+    <p class="error" id="error" hidden></p>
+    <div class="card" style="overflow:auto; padding: 0;">
+      <table>
+        <thead>
+          <tr>
+            <th>txId</th>
+            <th>orderId</th>
+            <th>amount</th>
+            <th>currency</th>
+            <th>status</th>
+            <th>age</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </div>
+  <script>
+    const key = new URLSearchParams(window.location.search).get("key") || "";
+    const withKey = (path) => path + (key ? "?key=" + encodeURIComponent(key) : "");
+
+    function escapeHtml(value) {
+      return String(value == null ? "" : value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function age(createdAt) {
+      const ms = Date.now() - new Date(createdAt).getTime();
+      const s = Math.max(0, Math.floor(ms / 1000));
+      if (s < 60) return s + "s";
+      const m = Math.floor(s / 60);
+      if (m < 60) return m + "m " + (s % 60) + "s";
+      const h = Math.floor(m / 60);
+      return h + "h " + (m % 60) + "m";
+    }
+
+    function setCounts(txs) {
+      const counts = { pending: 0, confirming: 0, confirmed: 0, failed: 0 };
+      txs.forEach((tx) => { if (counts[tx.status] != null) counts[tx.status] += 1; });
+      document.getElementById("count-pending").textContent = counts.pending;
+      document.getElementById("count-confirming").textContent = counts.confirming;
+      document.getElementById("count-confirmed").textContent = counts.confirmed;
+      document.getElementById("count-failed").textContent = counts.failed;
+    }
+
+    async function load() {
+      const errorEl = document.getElementById("error");
+      try {
+        const res = await fetch(withKey("/sandbox/transactions"));
+        if (!res.ok) throw new Error("Failed to load transactions (" + res.status + ")");
+        const payload = await res.json();
+        const txs = Array.isArray(payload) ? payload : (payload.data || []);
+        setCounts(txs);
+        document.getElementById("meta").textContent = txs.length + " transaction(s)";
+        document.getElementById("rows").innerHTML = txs.length
+          ? txs.map((tx) => (
+              "<tr>" +
+              "<td class=\"mono\">" + escapeHtml(tx.txId) + "</td>" +
+              "<td>" + escapeHtml(tx.orderId) + "</td>" +
+              "<td>" + escapeHtml(tx.amount) + "</td>" +
+              "<td>" + escapeHtml(tx.currency) + "</td>" +
+              "<td><span class=\"badge " + escapeHtml(tx.status) + "\">" + escapeHtml(tx.status) + "</span></td>" +
+              "<td>" + escapeHtml(age(tx.createdAt)) + "</td>" +
+              "</tr>"
+            )).join("")
+          : "<tr><td colspan=\"6\">No transactions yet</td></tr>";
+        errorEl.hidden = true;
+      } catch (err) {
+        errorEl.hidden = false;
+        errorEl.textContent = err.message;
+      }
+    }
+
+    document.getElementById("reset").addEventListener("click", async () => {
+      if (!confirm("Clear all sandbox transactions and sessions?")) return;
+      const res = await fetch(withKey("/sandbox/reset"), { method: "DELETE" });
+      if (!res.ok) {
+        document.getElementById("error").hidden = false;
+        document.getElementById("error").textContent = "Reset failed (" + res.status + ")";
+        return;
+      }
+      await load();
+    });
+
+    load();
+    setInterval(load, 5000);
+  </script>
+</body>
+</html>
