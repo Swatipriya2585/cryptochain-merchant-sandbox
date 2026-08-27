@@ -12,7 +12,9 @@ function buildWebhookPayload(tx, event) {
       ? 'payment.confirmed'
       : tx.status === 'confirming'
         ? 'payment.confirming'
-        : 'payment.pending');
+        : tx.status === 'failed'
+          ? 'payment.failed'
+          : 'payment.pending');
 
   return {
     success: true,
@@ -83,16 +85,10 @@ router.post('/webhook/simulate', async (req, res) => {
     );
   }
 
-  tx = mockDb.syncStatusFromElapsedTime(tx.txId) || tx;
+  tx = mockDb.getTransaction(tx.txId) || tx;
 
   if (status && ['pending', 'confirming', 'confirmed', 'failed'].includes(status) && status !== tx.status) {
-    tx = mockDb.updateTransaction(tx.txId, {
-      status,
-      confirmations:
-        status === 'confirmed' ? tx.requiredConfirmations : status === 'confirming' ? Math.max(1, tx.confirmations) : 0,
-      confirmedAt: status === 'confirmed' ? new Date().toISOString() : tx.confirmedAt,
-      blockNumber: status === 'pending' ? tx.blockNumber : tx.blockNumber || Math.floor(Date.now() / 1000),
-    });
+    tx = mockDb.updateTransactionStatus(tx.txId, status, { force: true }) || tx;
   }
 
   const delivery = await deliverWebhook(targetUrl, tx, event);

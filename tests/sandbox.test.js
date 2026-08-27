@@ -5,6 +5,7 @@ const request = require('supertest');
 
 process.env.SANDBOX_API_KEY = 'sk_test_sandbox_cryptochain_2026';
 process.env.CONFIRM_DELAY_MS = '40';
+process.env.FAIL_RATE = '0';
 process.env.PORT = '0';
 
 const app = require('../sandbox');
@@ -52,6 +53,7 @@ function startReceiver() {
 before(() => {
   process.env.SANDBOX_API_KEY = API_KEY;
   process.env.CONFIRM_DELAY_MS = '40';
+  process.env.FAIL_RATE = '0';
 });
 
 beforeEach(() => {
@@ -226,4 +228,28 @@ test('webhook simulate posts signed status to the merchant callback URL', async 
   } finally {
     await receiver.close();
   }
+});
+
+test('lists all transactions for the dashboard', async () => {
+  await auth(
+    request(app).post('/sandbox/pay').send({
+      amount: 1,
+      currency: 'USDC',
+      merchantId: 'mch_sandbox_001',
+      orderId: 'ord_list_1',
+    })
+  ).expect(201);
+  await auth(
+    request(app).post('/sandbox/pay').send({
+      amount: 2,
+      currency: 'SOL',
+      merchantId: 'mch_sandbox_001',
+      orderId: 'ord_list_2',
+    })
+  ).expect(201);
+
+  const res = await auth(request(app).get('/sandbox/transactions')).expect(200);
+  assert.equal(res.body.success, true);
+  assert.ok(res.body.data.length >= 2);
+  assert.ok(res.body.data.every((tx) => tx.txId && tx.status && tx.orderId));
 });

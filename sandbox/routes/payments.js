@@ -1,38 +1,24 @@
 const express = require('express');
 const mockDb = require('../data/mockDb');
-const { getConfirmDelayMs } = require('../utils/crypto');
 const { success, failure, paymentEnvelope } = require('../utils/response');
 const { deliverWebhook } = require('./webhook');
 
 const router = express.Router();
 
-function scheduleConfirmation(tx) {
-  const delay = getConfirmDelayMs();
-  const txId = tx.txId;
+const EVENT_BY_STATUS = {
+  pending: 'payment.pending',
+  confirming: 'payment.confirming',
+  confirmed: 'payment.confirmed',
+  failed: 'payment.failed',
+};
 
-  const confirmingTimer = setTimeout(async () => {
-    const current = mockDb.getTransaction(txId);
-    if (!current || current.status !== 'pending') return;
-    const updated = mockDb.progressTransaction(txId);
-    if (updated?.callbackUrl) {
-      await deliverWebhook(updated.callbackUrl, updated, 'payment.confirming');
-    }
-  }, delay);
-
-  const confirmedTimer = setTimeout(async () => {
-    const current = mockDb.getTransaction(txId);
-    if (!current || current.status === 'confirmed' || current.status === 'failed') return;
-    if (current.status === 'pending') {
-      mockDb.progressTransaction(txId);
-    }
-    const updated = mockDb.progressTransaction(txId);
-    if (updated?.callbackUrl) {
-      await deliverWebhook(updated.callbackUrl, updated, 'payment.confirmed');
-    }
-  }, delay * 2);
-
-  mockDb.registerTimers(txId, [confirmingTimer, confirmedTimer]);
-}
+mockDb.onStatusChange((tx) => {
+  if (!tx.callbackUrl) return;
+  const event = EVENT_BY_STATUS[tx.status] || `payment.${tx.status}`;
+  deliverWebhook(tx.callbackUrl, tx, event).catch((error) => {
+    console.error('Auto webhook delivery failed:', error.message);
+  });
+});
 
 router.post('/pay', (req, res) => {
   const { amount, currency, merchantId, orderId, callbackUrl, webhookUrl, description, from } = req.body || {};
@@ -65,7 +51,7 @@ router.post('/pay', (req, res) => {
     );
   }
 
-  const tx = mockDb.createPayment({
+  const tx = mockDb.createTransaction({
     amount: numericAmount,
     currency: String(currency).toUpperCase(),
     merchantId,
@@ -75,14 +61,12 @@ router.post('/pay', (req, res) => {
     from,
   });
 
-  scheduleConfirmation(tx);
-
   return res.status(201).json(success(paymentEnvelope(tx), 'Payment created'));
 });
 
 router.get('/status/:txId', (req, res) => {
   const { txId } = req.params;
-  let tx = mockDb.getTransaction(txId);
+  const tx = mockDb.getTransaction(txId);
 
   if (!tx) {
     return res.status(404).json(
@@ -90,10 +74,17 @@ router.get('/status/:txId', (req, res) => {
     );
   }
 
-  tx = mockDb.syncStatusFromElapsedTime(tx.txId) || tx;
-
   return res.status(200).json(success(paymentEnvelope(tx), 'Transaction fetched successfully'));
 });
 
+router.get('/transactions', (req, res) => {
+  const merchantId = req.query.merchantId;
+  const transactions = mockDb
+    .getAllTransactions()
+    .filter((tx) => !merchantId || tx.merchantId === merchantId)
+    .map(paymentEnvelope);
+
+  return res.status(200).json(success(transactions, 'Transactions retrieved'));
+});
+
 module.exports = router;
-module.exports.scheduleConfirmation = scheduleConfirmation;

@@ -32,7 +32,7 @@ curl -s -X POST http://localhost:4000/sandbox/pay \
 ```
 sandbox/
   index.js              Express entry point (CORS for localhost + website domain)
-  .env.example          SANDBOX_API_KEY, PORT, ALLOWED_ORIGINS, CONFIRM_DELAY_MS
+  .env.example          SANDBOX_API_KEY, PORT, ALLOWED_ORIGINS, CONFIRM_DELAY_MS, FAIL_RATE
   README.md             How to run, endpoints, sandbox API key
   routes/
     payments.js         POST /sandbox/pay, GET /sandbox/status/:txId
@@ -42,7 +42,7 @@ sandbox/
     auth.js             Validate sandbox API key
     logger.js           Log timestamp, method, path, body
   data/
-    mockDb.js           In-memory transactions and merchant state
+    mockDb.js           In-memory store + pending->confirming->confirmed|failed state machine
   utils/
     crypto.js           Fake txHash / confirmation helpers
     response.js         CryptoChain API response envelope

@@ -9,6 +9,7 @@ const { requireApiKey } = require('./middleware/auth');
 const paymentsRouter = require('./routes/payments');
 const webhookRouter = require('./routes/webhook');
 const merchantRouter = require('./routes/merchant');
+const mockDb = require('./data/mockDb');
 
 const PORT = Number(process.env.PORT) || 4000;
 const DEFAULT_ORIGINS = [
@@ -114,10 +115,12 @@ if (require.main === module) {
     console.warn('SANDBOX_API_KEY was not set; using the documented sandbox demo key');
   }
 
+  mockDb.startStateMachine();
   app.listen(PORT, () => {
     console.log(`CryptoChain merchant sandbox listening on http://localhost:${PORT}`);
     console.log(`Health:  GET  http://localhost:${PORT}/health`);
     console.log(`Pay:     POST http://localhost:${PORT}/sandbox/pay`);
+    console.log(`State machine ticks every ${mockDb.STATE_MACHINE_INTERVAL_MS}ms`);
   });
 }
 

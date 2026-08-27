@@ -19,7 +19,13 @@ const REQUIRED_CONFIRMATIONS = {
 
 function getConfirmDelayMs() {
   const parsed = Number(process.env.CONFIRM_DELAY_MS);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 3000;
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 8000;
+}
+
+function getFailRate() {
+  const parsed = Number(process.env.FAIL_RATE);
+  if (!Number.isFinite(parsed) || parsed < 0) return 0.1;
+  return Math.min(1, parsed);
 }
 
 function getNetwork(currency) {
@@ -67,6 +73,7 @@ function nextStatus(current) {
 
 module.exports = {
   getConfirmDelayMs,
+  getFailRate,
   getNetwork,
   getRequiredConfirmations,
   generateTxId,

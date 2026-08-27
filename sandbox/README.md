@@ -48,7 +48,8 @@ Copy `sandbox/.env.example`. Variables:
 | `SANDBOX_API_KEY` | `sk_test_sandbox_cryptochain_2026` | Static sandbox API key |
 | `PORT` | `4000` | HTTP port |
 | `ALLOWED_ORIGINS` | localhost + `https://cryptochain.io` | CORS allowlist (comma-separated). Any `localhost` / `127.0.0.1` origin is also allowed. |
-| `CONFIRM_DELAY_MS` | `3000` | Delay between `pending → confirming` and `confirming → confirmed` |
+| `CONFIRM_DELAY_MS` | `8000` | Delay between `pending → confirming` and `confirming → confirmed` |
+| `FAIL_RATE` | `0.1` | Probability a transaction ends as `failed` instead of `confirmed` |
 
 ## Endpoints
 
@@ -80,7 +81,15 @@ Poll payment status. `:txId` may be the `txId` or the `txHash`. Status progresse
 
 `pending` → `confirming` → `confirmed`
 
-Progress is driven by `setTimeout` using `CONFIRM_DELAY_MS` (one delay per transition). Polling also advances status from elapsed time so clients do not depend on timer jitter.
+Progress is driven by the in-memory state machine in `data/mockDb.js`. A background `setInterval` (every 2 seconds) moves due transactions:
+
+`pending` → `confirming` → `confirmed`
+
+About `FAIL_RATE` (default 10%) of payments go `confirming` → `failed` instead of `confirmed`. `GET /sandbox/status/:txId` also applies due transitions immediately so polling does not wait for the next 2s tick.
+
+### `GET /sandbox/transactions`
+
+Dashboard listing of every sandbox transaction (newest first). Optional `?merchantId=` filter.
 
 ### `POST /sandbox/webhook/simulate`
 
