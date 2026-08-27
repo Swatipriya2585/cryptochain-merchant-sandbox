@@ -1,24 +1,7 @@
 const express = require('express');
 const mockDb = require('../data/mockDb');
 const { success, failure, paymentEnvelope } = require('../utils/response');
-const { deliverWebhook } = require('./webhook');
-
 const router = express.Router();
-
-const EVENT_BY_STATUS = {
-  pending: 'payment.pending',
-  confirming: 'payment.confirming',
-  confirmed: 'payment.confirmed',
-  failed: 'payment.failed',
-};
-
-mockDb.onStatusChange((tx) => {
-  if (!tx.callbackUrl) return;
-  const event = EVENT_BY_STATUS[tx.status] || `payment.${tx.status}`;
-  deliverWebhook(tx.callbackUrl, tx, event).catch((error) => {
-    console.error('Auto webhook delivery failed:', error.message);
-  });
-});
 
 router.post('/pay', (req, res) => {
   const { amount, currency, merchantId, orderId, callbackUrl, webhookUrl, description, from } = req.body || {};

@@ -1,36 +1,27 @@
 const express = require('express');
 const mockDb = require('../data/mockDb');
 const { signWebhookPayload } = require('../utils/crypto');
-const { success, failure, paymentEnvelope } = require('../utils/response');
 
 const router = express.Router();
 
-function buildWebhookPayload(tx, event) {
-  const statusEvent =
-    event ||
-    (tx.status === 'confirmed'
-      ? 'payment.confirmed'
-      : tx.status === 'confirming'
-        ? 'payment.confirming'
-        : tx.status === 'failed'
-          ? 'payment.failed'
-          : 'payment.pending');
-
+function buildWebhookPayload(tx) {
   return {
-    success: true,
-    event: statusEvent,
-    type: 'transaction_update',
-    data: paymentEnvelope(tx),
-    message: 'Transaction status update',
+    event: 'payment.status_update',
+    txId: tx.txId,
+    txHash: tx.txHash,
+    status: tx.status,
+    amount: tx.amount,
+    currency: tx.currency,
     timestamp: new Date().toISOString(),
   };
 }
 
-async function deliverWebhook(callbackUrl, tx, event) {
-  const payload = buildWebhookPayload(tx, event);
+async function deliverWebhook(callbackUrl, tx) {
+  const payload = buildWebhookPayload(tx);
   const body = JSON.stringify(payload);
   const secret = process.env.SANDBOX_API_KEY || 'sandbox';
   const signature = signWebhookPayload(body, secret);
+  const deliveredAt = new Date().toISOString();
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
@@ -49,18 +40,29 @@ async function deliverWebhook(callbackUrl, tx, event) {
       signal: controller.signal,
     });
 
-    const responseBody = await response.text();
     return {
-      delivered: response.ok,
+      delivered: true,
+      deliveredAt,
       statusCode: response.status,
-      responseBody,
       payload,
     };
   } catch (error) {
+    const message = error.name === 'AbortError' ? 'Webhook delivery timed out' : error.message;
+    console.error(
+      JSON.stringify({
+        level: 'error',
+        event: 'webhook_delivery_failed',
+        timestamp: new Date().toISOString(),
+        txId: tx.txId,
+        callbackUrl,
+        error: message,
+      })
+    );
     return {
       delivered: false,
+      deliveredAt: null,
       statusCode: null,
-      error: error.name === 'AbortError' ? 'Webhook delivery timed out' : error.message,
+      error: message,
       payload,
     };
   } finally {
@@ -68,57 +70,53 @@ async function deliverWebhook(callbackUrl, tx, event) {
   }
 }
 
-router.post('/webhook/simulate', async (req, res) => {
-  const { txId, callbackUrl, webhookUrl, status, event } = req.body || {};
-  const targetUrl = callbackUrl || webhookUrl;
-
-  if (!txId || !targetUrl) {
-    return res.status(400).json(
-      failure('Missing required fields: txId, callbackUrl', 'Webhook simulation request is invalid')
-    );
-  }
-
-  let tx = mockDb.getTransaction(txId);
-  if (!tx) {
-    return res.status(404).json(
-      failure('Transaction not found', `No transaction exists for txId ${txId}`)
-    );
-  }
-
-  tx = mockDb.getTransaction(tx.txId) || tx;
-
-  if (status && ['pending', 'confirming', 'confirmed', 'failed'].includes(status) && status !== tx.status) {
-    tx = mockDb.updateTransactionStatus(tx.txId, status, { force: true }) || tx;
-  }
-
-  const delivery = await deliverWebhook(targetUrl, tx, event);
-
-  if (!delivery.delivered) {
-    return res.status(502).json(
-      failure(delivery.error || `Webhook endpoint returned ${delivery.statusCode}`, 'Failed to deliver webhook', {
-        data: {
-          callbackUrl: targetUrl,
-          txId: tx.txId,
-          payload: delivery.payload,
-          statusCode: delivery.statusCode,
-        },
+mockDb.onStatusChange((tx) => {
+  if (!tx.callbackUrl) return;
+  deliverWebhook(tx.callbackUrl, tx).catch((error) => {
+    console.error(
+      JSON.stringify({
+        level: 'error',
+        event: 'webhook_delivery_failed',
+        timestamp: new Date().toISOString(),
+        txId: tx.txId,
+        callbackUrl: tx.callbackUrl,
+        error: error.message,
       })
     );
+  });
+});
+
+router.post('/webhook/simulate', async (req, res) => {
+  const { txId, callbackUrl } = req.body || {};
+
+  if (!txId || !callbackUrl) {
+    return res.status(400).json({
+      success: false,
+      error: 'Missing required fields: txId, callbackUrl',
+    });
   }
 
-  return res.status(200).json(
-    success(
-      {
-        callbackUrl: targetUrl,
-        txId: tx.txId,
-        status: tx.status,
-        delivered: true,
-        statusCode: delivery.statusCode,
-        payload: delivery.payload,
-      },
-      'Webhook delivered'
-    )
-  );
+  const tx = mockDb.getTransaction(txId);
+  if (!tx) {
+    return res.status(404).json({
+      success: false,
+      error: `Transaction not found: ${txId}`,
+    });
+  }
+
+  const delivery = await deliverWebhook(callbackUrl, tx);
+
+  if (!delivery.delivered) {
+    return res.status(502).json({
+      success: false,
+      error: delivery.error || 'Callback URL is unreachable',
+    });
+  }
+
+  return res.status(200).json({
+    success: true,
+    deliveredAt: delivery.deliveredAt,
+  });
 });
 
 module.exports = router;

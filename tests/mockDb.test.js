@@ -124,3 +124,15 @@ test('tickStateMachine auto-progresses due transactions in the background', () =
   off();
   assert.ok(statuses.includes('confirmed'), statuses.join(','));
 });
+
+test('createTransaction stores optional callbackUrl', () => {
+  const tx = mockDb.createTransaction({
+    amount: 1,
+    currency: 'USDC',
+    merchantId: 'mch_sandbox_001',
+    orderId: 'ord_cb',
+    callbackUrl: 'https://merchant.example/webhooks/cryptochain',
+  });
+  assert.equal(tx.callbackUrl, 'https://merchant.example/webhooks/cryptochain');
+  assert.equal(tx.status, 'pending');
+});

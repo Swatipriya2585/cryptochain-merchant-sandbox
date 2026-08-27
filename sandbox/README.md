@@ -95,21 +95,40 @@ Dashboard listing of every sandbox transaction (newest first). Optional `?mercha
 
 ### `POST /sandbox/webhook/simulate`
 
-POST the current (or overridden) transaction status to a merchant callback URL.
+Look up a transaction and POST its current status to a merchant callback URL.
 
 ```json
 {
   "txId": "tx_...",
-  "callbackUrl": "https://merchant.example/webhooks/cryptochain",
-  "status": "confirmed"
+  "callbackUrl": "https://merchant.example/webhooks/cryptochain"
 }
 ```
 
-The outbound webhook is HMAC-SHA256 signed with `SANDBOX_API_KEY`:
+Outbound body:
 
-- `X-CryptoChain-Signature`
-- `X-CryptoChain-Signature-256: sha256=<hex>`
-- `X-CryptoChain-Event`
+```json
+{
+  "event": "payment.status_update",
+  "txId": "tx_...",
+  "txHash": "0x...",
+  "status": "pending",
+  "amount": 25.5,
+  "currency": "USDC",
+  "timestamp": "2026-08-27T13:00:00.000Z"
+}
+```
+
+Responses:
+
+```json
+{ "success": true, "deliveredAt": "2026-08-27T13:00:00.000Z" }
+```
+
+```json
+{ "success": false, "error": "fetch failed" }
+```
+
+The same payload is auto-delivered whenever the state machine moves a transaction that was created with `callbackUrl`.
 
 ### `POST /sandbox/merchant/login`
 

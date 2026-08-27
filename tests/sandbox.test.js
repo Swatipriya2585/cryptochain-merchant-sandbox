@@ -217,7 +217,7 @@ test('merchant profile requires a Bearer session', async () => {
   assert.equal(res.body.error, 'Unauthorized');
 });
 
-test('webhook simulate posts signed status to the merchant callback URL', async () => {
+test('webhook simulate posts payment.status_update to the callback URL', async () => {
   const receiver = await startReceiver();
   try {
     const created = await auth(
@@ -233,20 +233,69 @@ test('webhook simulate posts signed status to the merchant callback URL', async 
       request(app).post('/sandbox/webhook/simulate').send({
         txId: created.body.data.txId,
         callbackUrl: receiver.url,
-        status: 'confirmed',
       })
     ).expect(200);
 
-    assert.equal(res.body.data.delivered, true);
+    assert.equal(res.body.success, true);
+    assert.ok(res.body.deliveredAt);
     assert.equal(receiver.received.length, 1);
     const hook = receiver.received[0];
-    assert.equal(hook.body.success, true);
-    assert.equal(hook.body.event, 'payment.confirmed');
-    assert.equal(hook.body.type, 'transaction_update');
-    assert.equal(hook.body.data.txId, created.body.data.txId);
-    assert.equal(hook.body.data.status, 'confirmed');
-    assert.ok(hook.headers['x-cryptochain-signature']);
-    assert.match(hook.headers['x-cryptochain-signature-256'], /^sha256=/);
+    assert.equal(hook.body.event, 'payment.status_update');
+    assert.equal(hook.body.txId, created.body.data.txId);
+    assert.equal(hook.body.txHash, created.body.data.txHash);
+    assert.equal(hook.body.status, created.body.data.status);
+    assert.equal(hook.body.amount, 9);
+    assert.equal(hook.body.currency, 'USDC');
+    assert.ok(hook.body.timestamp);
+  } finally {
+    await receiver.close();
+  }
+});
+
+test('webhook simulate returns success false when callbackUrl is unreachable', async () => {
+  const created = await auth(
+    request(app).post('/sandbox/pay').send({
+      amount: 3,
+      currency: 'USDC',
+      merchantId: 'mch_sandbox_001',
+      orderId: 'ord_unreachable',
+    })
+  ).expect(201);
+
+  const res = await auth(
+    request(app).post('/sandbox/webhook/simulate').send({
+      txId: created.body.data.txId,
+      callbackUrl: 'http://127.0.0.1:1/webhook',
+    })
+  ).expect(502);
+
+  assert.equal(res.body.success, false);
+  assert.ok(res.body.error);
+});
+
+test('state machine auto-delivers webhooks when callbackUrl is stored', async () => {
+  const receiver = await startReceiver();
+  try {
+    const created = await auth(
+      request(app).post('/sandbox/pay').send({
+        amount: 5,
+        currency: 'ETH',
+        merchantId: 'mch_sandbox_001',
+        orderId: 'ord_auto_hook',
+        callbackUrl: receiver.url,
+      })
+    ).expect(201);
+    assert.equal(created.body.data.callbackUrl, receiver.url);
+
+    await sleep(50);
+    await auth(request(app).get(`/sandbox/status/${created.body.data.txId}`)).expect(200);
+    await sleep(40);
+
+    assert.ok(receiver.received.length >= 1);
+    const hook = receiver.received[0];
+    assert.equal(hook.body.event, 'payment.status_update');
+    assert.equal(hook.body.txId, created.body.data.txId);
+    assert.ok(['confirming', 'confirmed'].includes(hook.body.status));
   } finally {
     await receiver.close();
   }

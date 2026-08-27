@@ -41,6 +41,7 @@ function paymentEnvelope(tx) {
     requiredConfirmations: tx.requiredConfirmations,
     blockNumber: tx.blockNumber,
     network: tx.network,
+    callbackUrl: tx.callbackUrl || null,
     metadata: tx.metadata,
     createdAt: tx.createdAt,
     updatedAt: tx.updatedAt,
