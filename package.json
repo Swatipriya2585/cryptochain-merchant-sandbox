@@ -1,0 +1,30 @@
+{
+  "name": "cryptochain-merchant-sandbox",
+  "version": "1.0.0",
+  "description": "Standalone Node.js/Express sandbox that simulates the CryptoChain merchant payment API",
+  "main": "sandbox/index.js",
+  "scripts": {
+    "start": "node sandbox/index.js",
+    "dev": "node --watch sandbox/index.js",
+    "test": "node --test tests/*.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "cryptochain",
+    "merchant",
+    "sandbox",
+    "payments",
+    "express"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "supertest": "^7.1.4"
+  }
+}
