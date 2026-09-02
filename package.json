@@ -1,0 +1,33 @@
+{
+  "name": "cryptochain-backend-sandbox",
+  "version": "1.0.0",
+  "description": "Testnet-only CryptoChain Express backend. Talks exclusively to Ethereum Sepolia and a local sandbox SQLite file. Never connects to mainnet or production databases.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test tests/*.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "cryptochain",
+    "sandbox",
+    "sepolia",
+    "testnet",
+    "express",
+    "payments"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "ethers": "^6.15.0",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "supertest": "^7.1.4"
+  }
+}
