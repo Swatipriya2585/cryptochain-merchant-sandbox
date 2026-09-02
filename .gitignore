@@ -1,0 +1,10 @@
+node_modules/
+.env
+.env.local
+.env.sandbox
+db/data/*.sqlite
+db/data/*.sqlite-*
+db/data/*.db
+*.log
+.DS_Store
+coverage/
