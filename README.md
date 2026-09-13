@@ -87,6 +87,7 @@ Smoke check:
 
 ```bash
 curl http://localhost:4000/health
+# {"status":"ok","mode":"sandbox","dbConnected":true}
 ```
 
 The backend loads environment variables from the repo-root `.env.sandbox` file.

@@ -1,38 +1,45 @@
-import express from "express";
-import { Pool } from "pg";
-import { getConfig } from "./config";
+import cors from "cors";
+import express, { type Request } from "express";
+import helmet from "helmet";
+import { config } from "./config/env";
+import { logger } from "./lib/logger";
+import { prisma } from "./lib/prisma";
 
-export function createApp() {
-  const app = express();
-  app.use(express.json());
+export const STRIPE_WEBHOOK_PATH = "/webhooks/stripe";
 
-  app.get("/health", (_req, res) => {
-    const config = getConfig();
-    res.json({
-      status: "ok",
-      service: "cryptochain-sandbox-backend",
-      nodeEnv: config.nodeEnv,
-    });
+export const app = express();
+
+app.use(helmet());
+app.use(
+  cors({
+    origin: config.CORS_ORIGIN,
+    credentials: true,
+  }),
+);
+
+// Stripe signature verification needs the unmodified raw body on this path.
+app.use(STRIPE_WEBHOOK_PATH, express.raw({ type: "application/json" }));
+
+app.use(
+  express.json({
+    verify: (req, _res, buf) => {
+      (req as Request).rawBody = buf;
+    },
+  }),
+);
+
+app.get("/health", async (_req, res) => {
+  let dbConnected = false;
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    dbConnected = true;
+  } catch (error) {
+    logger.warn({ err: error }, "health check could not reach the database");
+  }
+
+  res.status(200).json({
+    status: "ok",
+    mode: config.mode,
+    dbConnected,
   });
-
-  app.get("/health/db", async (_req, res) => {
-    const { databaseUrl } = getConfig();
-    if (!databaseUrl) {
-      res.status(503).json({ status: "error", error: "DATABASE_URL is not set" });
-      return;
-    }
-
-    const pool = new Pool({ connectionString: databaseUrl });
-    try {
-      await pool.query("SELECT 1");
-      res.json({ status: "ok", database: "up" });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "database unreachable";
-      res.status(503).json({ status: "error", database: "down", error: message });
-    } finally {
-      await pool.end();
-    }
-  });
-
-  return app;
-}
+});
