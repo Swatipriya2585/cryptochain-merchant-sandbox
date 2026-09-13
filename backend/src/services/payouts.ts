@@ -1,6 +1,7 @@
 import { PaymentStatus, PayoutStatus, type Payout, type Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { logger } from "../lib/logger";
+import { enqueueOpsAlert } from "../lib/alerts";
 
 export type CreatePayoutInput = {
   paymentIntentId: string;
@@ -104,10 +105,29 @@ export async function applyStripeEventToPayout(event: StripeLikeEvent): Promise<
     data.paidAt = new Date();
   }
 
+  if (event.type === "payout.failed" || event.type === "payout.canceled") {
+    data.stripePayoutId = objectId ?? payout.stripePayoutId;
+    data.status = PayoutStatus.FAILED;
+  }
+
   payout = await prisma.payout.update({
     where: { id: payout.id },
     data,
   });
+
+  if (payout.status === PayoutStatus.FAILED) {
+    enqueueOpsAlert({
+      title: "Payout FAILED",
+      body: `Payout ${payout.id} marked FAILED from Stripe event ${event.type}.`,
+      severity: "error",
+      fields: {
+        payoutId: payout.id,
+        paymentIntentId: payout.paymentIntentId,
+        stripeEvent: event.type,
+      },
+      dedupeKey: `payout-failed:${payout.id}`,
+    });
+  }
 
   logger.info(
     { payoutId: payout.id, type: event.type, status: payout.status },
@@ -122,8 +142,8 @@ export async function applyStripeEventToPayout(event: StripeLikeEvent): Promise<
  * with stripe.payouts.create + connected-account webhooks before go-live.
  */
 export async function simulateStripeTestEvent(payoutId: string, type: string) {
-  if (type !== "payout.paid" && type !== "payment_intent.succeeded") {
-    throw new Error('type must be "payout.paid" or "payment_intent.succeeded"');
+  if (type !== "payout.paid" && type !== "payment_intent.succeeded" && type !== "payout.failed") {
+    throw new Error('type must be "payout.paid", "payout.failed", or "payment_intent.succeeded"');
   }
 
   const payout = await prisma.payout.findUnique({ where: { id: payoutId } });

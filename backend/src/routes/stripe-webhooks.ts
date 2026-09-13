@@ -31,7 +31,12 @@ stripeWebhooksRouter.post("/", async (req: Request, res: Response) => {
   }
 
   try {
-    if (event.type === "payment_intent.succeeded" || event.type === "payout.paid") {
+    if (
+      event.type === "payment_intent.succeeded" ||
+      event.type === "payout.paid" ||
+      event.type === "payout.failed" ||
+      event.type === "payout.canceled"
+    ) {
       const payout = await applyStripeEventToPayout(event);
       res.json({
         received: true,

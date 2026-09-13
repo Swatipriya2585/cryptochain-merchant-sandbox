@@ -1,10 +1,11 @@
 import { PaymentStatus, type PaymentIntent } from "@prisma/client";
+import { config } from "../config/env";
 import { prisma } from "../lib/prisma";
 import { fromWei, toWei } from "../blockchain/amounts";
 
 export type MerchantSummary = {
   merchantId: string;
-  network: "sepolia";
+  network: "sepolia" | "mainnet";
   totalConfirmedVolumeCrypto: string;
   currencyCrypto: "ETH";
   pendingCount: number;
@@ -60,7 +61,7 @@ export async function getMerchantSummary(merchantId: string): Promise<MerchantSu
 
   return {
     merchantId,
-    network: "sepolia",
+    network: config.network,
     totalConfirmedVolumeCrypto: fromWei(volumeWei),
     currencyCrypto: "ETH",
     pendingCount,

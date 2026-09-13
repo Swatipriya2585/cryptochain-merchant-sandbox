@@ -1,10 +1,11 @@
 import { randomBytes } from "node:crypto";
 import { PaymentStatus } from "@prisma/client";
 import { config } from "../config/env";
+import { assertAmountWithinCap, assertPaymentsAllowed } from "../config/limits";
 import { prisma } from "../lib/prisma";
 import { ensureMerchant } from "./merchants";
 import { toWei } from "../blockchain/amounts";
-import { getSharedReceiveAddress, SEPOLIA_CHAIN_ID_NUMBER } from "../blockchain/provider";
+import { getSharedReceiveAddress } from "../blockchain/provider";
 
 export type CreatePaymentIntentInput = {
   merchantId: string;
@@ -14,27 +15,21 @@ export type CreatePaymentIntentInput = {
 };
 
 /**
- * Sandbox receive strategy: one shared Sepolia address plus a unique `reference`.
+ * Receive strategy: one shared address plus a unique `reference`.
  *
  * Tradeoff vs a per-intent address (HD derivation):
- * - Shared address is simple — one throwaway faucet-funded wallet, easy QR/URI, no key
- *   management per intent. The EIP-681 URI cannot carry a reliable on-chain memo for a
- *   plain ETH transfer, so the watcher matches inbound txs by amount (within tolerance)
- *   and optional calldata, then oldest PENDING intent. Colliding amounts can be
- *   attributed to the wrong intent.
- * - Unique addresses isolate funds and matching perfectly, but need HD keys, sweeping,
- *   and more faucet ETH. Use that before any production cutover.
+ * - Shared address is simple — one wallet, easy QR/URI, no key management per intent.
+ *   The EIP-681 URI cannot carry a reliable on-chain memo for a plain ETH transfer, so
+ *   the watcher matches inbound txs by amount (within tolerance) and optional calldata,
+ *   then oldest PENDING intent. Colliding amounts can be attributed to the wrong intent.
+ * - Unique addresses isolate funds and matching perfectly, but need HD keys and sweeping.
+ * Keep MAX_TRANSACTION_AMOUNT small until unique addresses exist. See CUTOVER_CHECKLIST.md.
  */
 export async function createPaymentIntent(input: CreatePaymentIntentInput) {
-  if (config.NODE_ENV !== "sandbox") {
-    throw new Error("Payment intents can only be created when NODE_ENV=sandbox.");
-  }
+  assertPaymentsAllowed();
 
   const amount = input.amountRequestedCrypto.trim();
-  const amountWei = toWei(amount);
-  if (amountWei <= 0n) {
-    throw new Error("amountRequestedCrypto must be greater than zero.");
-  }
+  const amountWei = assertAmountWithinCap(amount);
 
   await ensureMerchant(input.merchantId);
 
@@ -62,7 +57,7 @@ export function buildPaymentUri(address: string, amountWei: bigint, reference: s
   const params = new URLSearchParams({
     value: amountWei.toString(),
   });
-  return `ethereum:${address}@${SEPOLIA_CHAIN_ID_NUMBER}?${params.toString()}#${reference}`;
+  return `ethereum:${address}@${config.chainId}?${params.toString()}#${reference}`;
 }
 
 export async function listPaymentIntents(opts: {
@@ -133,8 +128,8 @@ export function serializePaymentIntent(
     expiresAt: row.expiresAt.toISOString(),
     createdAt: row.createdAt.toISOString(),
     updatedAt: (row.updatedAt ?? row.createdAt).toISOString(),
-    network: "sepolia" as const,
-    chainId: SEPOLIA_CHAIN_ID_NUMBER,
+    network: config.network,
+    chainId: config.chainId,
     paymentUri: paymentUri ?? buildPaymentUri(row.expectedAddress, amountWei, row.reference),
   };
 }

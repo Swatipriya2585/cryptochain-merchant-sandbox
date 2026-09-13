@@ -1,6 +1,8 @@
 import { logger } from "../lib/logger";
 import { prisma } from "../lib/prisma";
 import { signWebhookPayload, WEBHOOK_SIGNATURE_HEADER } from "./signature";
+import { config } from "../config/env";
+import { enqueueOpsAlert } from "../lib/alerts";
 
 /** Immediate, +30s, +5min — three attempts total. */
 export const WEBHOOK_RETRY_DELAYS_MS = [0, 30_000, 5 * 60_000] as const;
@@ -47,7 +49,7 @@ function buildOutboundEvent(event: {
     object: "event" as const,
     type: event.eventType,
     created: Math.floor(event.createdAt.getTime() / 1000),
-    livemode: false,
+    livemode: config.NODE_ENV === "production",
     data: {
       object: event.payload,
     },
@@ -154,6 +156,13 @@ export async function deliverWebhookEvent(
       return true;
     }
     if (result === "fatal") {
+      enqueueOpsAlert({
+        title: "Merchant webhook delivery failed",
+        body: `Webhook event ${eventId} cannot be delivered (fatal). Check merchant webhookUrl.`,
+        severity: "error",
+        fields: { eventId },
+        dedupeKey: `webhook-fatal:${eventId}`,
+      });
       return false;
     }
 
@@ -164,6 +173,13 @@ export async function deliverWebhookEvent(
   }
 
   logger.warn({ eventId }, "webhook delivery exhausted retries");
+  enqueueOpsAlert({
+    title: "Merchant webhook delivery exhausted retries",
+    body: `Webhook event ${eventId} failed after ${WEBHOOK_RETRY_DELAYS_MS.length} attempts.`,
+    severity: "error",
+    fields: { eventId, attempts: String(WEBHOOK_RETRY_DELAYS_MS.length) },
+    dedupeKey: `webhook-exhausted:${eventId}`,
+  });
   return false;
 }
 

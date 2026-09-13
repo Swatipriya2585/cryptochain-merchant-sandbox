@@ -105,6 +105,8 @@ Every push and pull request runs [`.github/workflows/ci.yml`](.github/workflows/
 
 A separate [`.github/workflows/sepolia-smoke.yml`](.github/workflows/sepolia-smoke.yml) job hits a real Sepolia RPC nightly (and on `workflow_dispatch`). Do not add that call to the per-commit workflow.
 
+Cutover from Sepolia/test Stripe to mainnet/live Stripe is **not** signed off. Walk through [`infra/CUTOVER_CHECKLIST.md`](infra/CUTOVER_CHECKLIST.md) (each item is tagged CODE vs OPS). Compare env vars in [`infra/SANDBOX_VS_PRODUCTION.md`](infra/SANDBOX_VS_PRODUCTION.md). Copy blanks from [`.env.production.example`](.env.production.example) into a secrets manager — never paste a private key into chat. Production requires `MAX_TRANSACTION_AMOUNT` (server-side cap) and defaults `PAYMENTS_ENABLED=false` and `REQUIRED_CONFIRMATIONS=12`.
+
 ## Stripe test-mode payouts (INR / merchant fiat leg)
 
 Crypto confirmations and fiat payouts are independent. After a PaymentIntent is `CONFIRMED` on Sepolia, create a sandbox Payout (INR) and drive it with Stripe **test-mode** webhooks. This does **not** call Stripe Connect; `POST /api/payouts/:id/simulate-stripe-event` is the placeholder until Connect is set up.

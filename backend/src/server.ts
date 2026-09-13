@@ -25,6 +25,6 @@ app.listen(config.PORT, () => {
   logger.info({ mode: config.mode, chain: config.chain, port: config.PORT }, "backend started");
 
   void startPaymentWatcher().catch((error) => {
-    logger.error({ err: error }, "failed to start Sepolia payment watcher");
+    logger.error({ err: error }, "failed to start payment watcher");
   });
 });
