@@ -154,6 +154,27 @@ export async function simulateStripeTestEvent(payoutId: string, type: string) {
   return serializePayout(updated);
 }
 
+export async function listPayouts(opts: { merchantId: string; page: number; limit: number }) {
+  const where = { merchantId: opts.merchantId };
+  const [total, rows] = await prisma.$transaction([
+    prisma.payout.count({ where }),
+    prisma.payout.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (opts.page - 1) * opts.limit,
+      take: opts.limit,
+    }),
+  ]);
+
+  return {
+    items: rows.map((row) => serializePayout(row)),
+    page: opts.page,
+    limit: opts.limit,
+    total,
+    totalPages: total === 0 ? 0 : Math.ceil(total / opts.limit),
+  };
+}
+
 export function serializePayout(row: Payout) {
   return {
     id: row.id,

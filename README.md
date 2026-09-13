@@ -82,6 +82,7 @@ The API listens on `PORT` from `.env.sandbox` (default `http://localhost:4000`).
 | `npm start` | Run the compiled `dist` build |
 | `npm test` | Unit tests |
 | `npm run lint` | ESLint + Prettier check |
+| `npm run sandbox:seed` | Seed demo merchant + intents for `/api/v1` |
 
 Smoke check:
 
@@ -136,6 +137,43 @@ curl -X POST http://localhost:4000/api/payouts/<payoutId>/simulate-stripe-event 
 ```
 
 `payment_intent.succeeded` records the Stripe PaymentIntent id on the row; `payout.paid` marks the payout `PAID`.
+
+## Flutter REST API (`/api/v1`)
+
+The Flutter app should call **`/api/v1`** only. Every response is `{ "data": ..., "error": null }` on success or `{ "data": null, "error": { "message", "fields?" } }` on failure. Unversioned `/api/...` routes are sandbox internals (webhooks, Stripe simulate) and do not use this envelope.
+
+Browse the live contract at **http://localhost:4000/api/docs** (Swagger UI) or **http://localhost:4000/api/openapi.json**.
+
+### Auth
+
+Send `X-API-Key`. Sandbox keys are prefixed `sandbox_`. The hashed key is stored on `Merchant.apiKeyHash` (never the plaintext). Production would issue `live_` keys after cutover.
+
+Seeded demo merchant (after `npm run sandbox:seed` in `backend/`):
+
+- Merchant id: `merchant_sandbox_seed`
+- `X-API-Key: sandbox_seed_frontend_key_aaaaaaaaaaaaaaaaaaaaaaaa`
+
+Rate limit: **100 requests per minute per API key**.
+
+### Routes
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/v1/merchants/:id` | Merchant profile |
+| `GET` | `/api/v1/merchants/:id/payment-intents?status=&page=&limit=` | Paginated intents |
+| `GET` | `/api/v1/payment-intents/:id` | Single intent (live watcher status) |
+| `POST` | `/api/v1/payment-intents` | Create intent (Sepolia sandbox) |
+| `GET` | `/api/v1/merchants/:id/payouts` | Paginated INR payouts |
+| `GET` | `/api/v1/merchants/:id/summary` | Dashboard: confirmed volume, pending count, success rate, avg confirmation time |
+
+Example:
+
+```bash
+curl http://localhost:4000/api/v1/merchants/merchant_sandbox_seed/summary \
+  -H 'X-API-Key: sandbox_seed_frontend_key_aaaaaaaaaaaaaaaaaaaaaaaa'
+```
+
+Validation failures return **400** with `error.fields`: `[{ "field": "status", "message": "..." }]`.
 
 ## Frontend
 

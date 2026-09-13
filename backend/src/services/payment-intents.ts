@@ -65,6 +65,39 @@ export function buildPaymentUri(address: string, amountWei: bigint, reference: s
   return `ethereum:${address}@${SEPOLIA_CHAIN_ID_NUMBER}?${params.toString()}#${reference}`;
 }
 
+export async function listPaymentIntents(opts: {
+  merchantId: string;
+  status?: PaymentStatus;
+  page: number;
+  limit: number;
+}) {
+  const where = {
+    merchantId: opts.merchantId,
+    ...(opts.status ? { status: opts.status } : {}),
+  };
+  const [total, rows] = await prisma.$transaction([
+    prisma.paymentIntent.count({ where }),
+    prisma.paymentIntent.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (opts.page - 1) * opts.limit,
+      take: opts.limit,
+    }),
+  ]);
+
+  return {
+    items: rows.map((row) => serializePaymentIntent(row)),
+    page: opts.page,
+    limit: opts.limit,
+    total,
+    totalPages: total === 0 ? 0 : Math.ceil(total / opts.limit),
+  };
+}
+
+export async function getPaymentIntent(id: string) {
+  return prisma.paymentIntent.findUnique({ where: { id } });
+}
+
 export function serializePaymentIntent(
   row: {
     id: string;
@@ -75,10 +108,12 @@ export function serializePaymentIntent(
     reference: string;
     status: PaymentStatus;
     txHash: string | null;
+    txBlockNumber?: number | null;
     confirmations: number;
     receivedAmountCrypto: { toString(): string } | null;
     expiresAt: Date;
     createdAt: Date;
+    updatedAt?: Date;
   },
   paymentUri?: string,
 ) {
@@ -92,11 +127,13 @@ export function serializePaymentIntent(
     reference: row.reference,
     status: row.status,
     txHash: row.txHash,
+    txBlockNumber: row.txBlockNumber ?? null,
     confirmations: row.confirmations,
     receivedAmountCrypto: row.receivedAmountCrypto?.toString() ?? null,
     expiresAt: row.expiresAt.toISOString(),
     createdAt: row.createdAt.toISOString(),
-    network: "sepolia",
+    updatedAt: (row.updatedAt ?? row.createdAt).toISOString(),
+    network: "sepolia" as const,
     chainId: SEPOLIA_CHAIN_ID_NUMBER,
     paymentUri: paymentUri ?? buildPaymentUri(row.expectedAddress, amountWei, row.reference),
   };

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { logger } from "../lib/logger";
-import { ensureMerchant, serializeMerchant } from "../services/merchants";
+import { createMerchantWithApiKey, serializeMerchant } from "../services/merchants";
 
 const upsertBodySchema = z.object({
   id: z.string().min(1),
@@ -19,11 +19,14 @@ merchantsRouter.post("/", async (req, res) => {
   }
 
   try {
-    const merchant = await ensureMerchant(parsed.data.id, {
+    const { merchant, apiKey, created } = await createMerchantWithApiKey(parsed.data.id, {
       webhookUrl: parsed.data.webhookUrl,
       webhookSecret: parsed.data.webhookSecret,
     });
-    res.status(201).json(serializeMerchant(merchant));
+    res.status(created ? 201 : 200).json({
+      ...serializeMerchant(merchant),
+      ...(apiKey ? { apiKey } : {}),
+    });
   } catch (error) {
     logger.error({ err: error }, "upsert merchant failed");
     res.status(500).json({ error: "Failed to save merchant" });

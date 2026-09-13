@@ -19,6 +19,8 @@ model Merchant {
   id             String          @id
   webhookUrl     String?
   webhookSecret  String
+  /// SHA-256 hex of the plaintext API key (`sandbox_…` or `live_…`). Never store the raw key.
+  apiKeyHash     String          @unique
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   paymentIntents PaymentIntent[]
