@@ -177,7 +177,14 @@ Validation failures return **400** with `error.fields`: `[{ "field": "status", "
 
 ## Frontend
 
-`frontend/` is a placeholder. Copy the existing Flutter app into that directory when it is ready.
+The merchant Flutter app lives in `frontend/`. It talks to `/api/v1`, shows a persistent **SANDBOX MODE** banner, and keeps LIVE/mainnet locked in release builds unless you pass `--dart-define=ENABLE_LIVE_MODE=true`.
+
+```bash
+cd frontend
+flutter run -d chrome --web-port 8080
+```
+
+See `frontend/README.md` for dart-define overrides, the Settings toggle, and the payment screens.
 
 ## Warning
 
