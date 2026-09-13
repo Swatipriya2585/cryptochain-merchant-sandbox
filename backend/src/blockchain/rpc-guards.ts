@@ -40,3 +40,20 @@ export function assertSandboxRpcUrl(rpcUrl: string, nodeEnv: string): void {
     );
   }
 }
+
+export function assertProductionRpcUrl(rpcUrl: string, nodeEnv: string): void {
+  if (nodeEnv !== "production") {
+    return;
+  }
+  if (isExplicitTestnet(rpcUrl)) {
+    throw new Error(
+      [
+        "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!",
+        "REFUSING TO LOAD A TESTNET RPC URL WHILE NODE_ENV=production.",
+        `MAINNET_RPC_URL=${rpcUrl}`,
+        "Production must use Ethereum mainnet. Sepolia / testnet hosts are a cutover leak.",
+        "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!",
+      ].join("\n"),
+    );
+  }
+}

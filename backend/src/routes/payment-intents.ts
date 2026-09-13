@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { logger } from "../lib/logger";
+import { HttpError } from "../http/envelope";
 import { createPaymentIntent } from "../services/payment-intents";
 
 const createBodySchema = z.object({
@@ -30,9 +31,12 @@ paymentIntentsRouter.post("/", async (req, res) => {
     const intent = await createPaymentIntent(parsed.data);
     res.status(201).json(intent);
   } catch (error) {
+    if (error instanceof HttpError) {
+      res.status(error.status).json({ error: error.message, fields: error.fields });
+      return;
+    }
     const message = error instanceof Error ? error.message : "Failed to create payment intent";
     logger.error({ err: error }, "create payment intent failed");
-    const status = message.includes("NODE_ENV") ? 403 : 400;
-    res.status(status).json({ error: message });
+    res.status(400).json({ error: message });
   }
 });

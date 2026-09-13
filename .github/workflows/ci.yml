@@ -51,6 +51,8 @@ env:
   STRIPE_TEST_SECRET_KEY: sk_test_ci_placeholder
   STRIPE_TEST_WEBHOOK_SECRET: whsec_ci_placeholder
   CORS_ORIGIN: http://localhost:8080
+  MAX_TRANSACTION_AMOUNT: "1"
+  PAYMENTS_ENABLED: "true"
 
 jobs:
   backend:

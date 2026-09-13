@@ -1,8 +1,15 @@
 import { JsonRpcProvider, Network, Wallet, type Provider } from "ethers";
-import { config } from "../config/env";
-import { assertSandboxRpcUrl, isMainnetRpcUrl } from "./rpc-guards";
+import {
+  config,
+  getRpcUrl,
+  getSignerPrivateKey,
+  MAINNET_CHAIN_ID,
+  SEPOLIA_CHAIN_ID,
+} from "../config/env";
+import { assertProductionRpcUrl, assertSandboxRpcUrl, isMainnetRpcUrl } from "./rpc-guards";
 
-const SEPOLIA_CHAIN_ID = 11155111n;
+const SEPOLIA_CHAIN_ID_BIGINT = BigInt(SEPOLIA_CHAIN_ID);
+const MAINNET_CHAIN_ID_BIGINT = BigInt(MAINNET_CHAIN_ID);
 const MOCK_SEPOLIA_HEAD_BLOCK = 9_000_000;
 
 let provider: JsonRpcProvider | undefined;
@@ -17,7 +24,7 @@ export function isMockChainProviderEnabled(env: NodeJS.ProcessEnv = process.env)
  * Nightly smoke uses a real RPC and must not set MOCK_CHAIN_PROVIDER.
  */
 export function createMockSepoliaProvider(): JsonRpcProvider {
-  const sepolia = Network.from(SEPOLIA_CHAIN_ID);
+  const sepolia = Network.from(SEPOLIA_CHAIN_ID_BIGINT);
   const mock = new JsonRpcProvider("https://mock.sepolia.invalid", sepolia, {
     staticNetwork: sepolia,
   });
@@ -49,87 +56,100 @@ export function resetProviderCacheForTests(): void {
   wallet = undefined;
 }
 
-function requireTestnetContext(): void {
+function requireConfiguredChain(): void {
   if (config.NODE_ENV === "sandbox") {
     assertSandboxRpcUrl(config.SEPOLIA_RPC_URL, config.NODE_ENV);
     return;
   }
 
-  throw new Error(
-    [
-      "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!",
-      "REFUSING TO CONSTRUCT A SIGNER/PROVIDER FOR PAYMENTS.",
-      `NODE_ENV=${config.NODE_ENV} chain=${config.chain}`,
-      "The ethers wallet is only loaded when NODE_ENV=sandbox (Sepolia testnet).",
-      "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!",
-    ].join("\n"),
-  );
+  if (isMockChainProviderEnabled()) {
+    throw new Error("MOCK_CHAIN_PROVIDER is not allowed when NODE_ENV=production.");
+  }
+  assertProductionRpcUrl(config.MAINNET_RPC_URL, config.NODE_ENV);
 }
 
 function normalizePrivateKey(key: string): string {
   return key.startsWith("0x") ? key : `0x${key}`;
 }
 
-export function getSepoliaRpcUrl(): string {
-  requireTestnetContext();
-  if (config.NODE_ENV !== "sandbox") {
-    throw new Error("Sepolia RPC is only available when NODE_ENV=sandbox.");
-  }
-  return config.SEPOLIA_RPC_URL;
+export function getConfiguredRpcUrl(): string {
+  requireConfiguredChain();
+  return getRpcUrl();
 }
 
 export function getProvider(): JsonRpcProvider {
-  requireTestnetContext();
+  requireConfiguredChain();
   if (!provider) {
-    if (isMockChainProviderEnabled()) {
+    if (config.NODE_ENV === "sandbox" && isMockChainProviderEnabled()) {
       provider = createMockSepoliaProvider();
     } else {
       // Do not pin staticNetwork: getNetwork() must observe the real chain id so a
-      // mainnet endpoint cannot hide behind a Sepolia label.
-      provider = new JsonRpcProvider(getSepoliaRpcUrl());
+      // mislabeled endpoint cannot hide behind the env var name.
+      provider = new JsonRpcProvider(getConfiguredRpcUrl());
     }
   }
   return provider;
 }
 
 export function getWallet(): Wallet {
-  requireTestnetContext();
+  requireConfiguredChain();
   if (!wallet) {
-    wallet = new Wallet(normalizePrivateKey(config.SEPOLIA_PRIVATE_KEY), getProvider());
+    wallet = new Wallet(normalizePrivateKey(getSignerPrivateKey()), getProvider());
   }
   return wallet;
 }
 
 /**
- * Shared sandbox receive address (the throwaway test wallet).
- * See createPaymentIntent for why intents share this address.
+ * Shared receive address derived from the configured signer key.
+ * Sandbox: throwaway Sepolia wallet. Production: dedicated mainnet signer
+ * from MAINNET_PRIVATE_KEY (never the sandbox throwaway).
  */
 export function getSharedReceiveAddress(): string {
-  requireTestnetContext();
-  return new Wallet(normalizePrivateKey(config.SEPOLIA_PRIVATE_KEY)).address;
+  requireConfiguredChain();
+  return new Wallet(normalizePrivateKey(getSignerPrivateKey())).address;
 }
 
-export async function assertConnectedToSepolia(
+export async function assertConnectedToConfiguredChain(
   activeProvider: Provider = getProvider(),
 ): Promise<void> {
-  requireTestnetContext();
+  requireConfiguredChain();
   const network = await activeProvider.getNetwork();
-  if (network.chainId === 1n || isMainnetRpcUrl(network.name)) {
+
+  if (config.NODE_ENV === "sandbox") {
+    if (network.chainId === MAINNET_CHAIN_ID_BIGINT || isMainnetRpcUrl(network.name)) {
+      throw new Error(
+        [
+          "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!",
+          "REFUSING TO USE THIS RPC WHILE NODE_ENV=sandbox.",
+          `Connected chainId=${network.chainId.toString()} name=${network.name}`,
+          "The endpoint resolved to Ethereum mainnet. Sandbox must use Sepolia (11155111).",
+          "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!",
+        ].join("\n"),
+      );
+    }
+    if (network.chainId !== SEPOLIA_CHAIN_ID_BIGINT) {
+      throw new Error(
+        `Sandbox provider must be Sepolia (chainId ${SEPOLIA_CHAIN_ID}); got ${network.chainId.toString()}.`,
+      );
+    }
+    return;
+  }
+
+  if (network.chainId !== MAINNET_CHAIN_ID_BIGINT) {
     throw new Error(
       [
         "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!",
-        "REFUSING TO USE THIS RPC WHILE NODE_ENV=sandbox.",
+        "REFUSING TO USE THIS RPC WHILE NODE_ENV=production.",
         `Connected chainId=${network.chainId.toString()} name=${network.name}`,
-        "The endpoint resolved to Ethereum mainnet. Sandbox must use Sepolia (11155111).",
+        `Production must be Ethereum mainnet (chainId ${MAINNET_CHAIN_ID}).`,
         "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!",
       ].join("\n"),
     );
   }
-  if (network.chainId !== SEPOLIA_CHAIN_ID) {
-    throw new Error(
-      `Sandbox provider must be Sepolia (chainId ${SEPOLIA_CHAIN_ID.toString()}); got ${network.chainId.toString()}.`,
-    );
-  }
 }
 
-export const SEPOLIA_CHAIN_ID_NUMBER = Number(SEPOLIA_CHAIN_ID);
+/** @deprecated Use assertConnectedToConfiguredChain. */
+export const assertConnectedToSepolia = assertConnectedToConfiguredChain;
+
+export const SEPOLIA_CHAIN_ID_NUMBER = SEPOLIA_CHAIN_ID;
+export const MAINNET_CHAIN_ID_NUMBER = MAINNET_CHAIN_ID;

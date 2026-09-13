@@ -18,18 +18,33 @@ export function getStripeTestSecretKey(): string {
   return key;
 }
 
+export function getStripeLiveSecretKey(): string {
+  if (config.NODE_ENV !== "production") {
+    throw new Error("Stripe live client is only available when NODE_ENV=production.");
+  }
+  const key = config.STRIPE_LIVE_SECRET_KEY;
+  if (!key.startsWith("sk_live_")) {
+    throw new Error(
+      "REFUSING TO INIT STRIPE: production received a non-live secret key. Use sk_live_… only.",
+    );
+  }
+  return key;
+}
+
 export function getStripeWebhookSecret(): string {
   if (config.NODE_ENV === "sandbox") {
     return config.STRIPE_TEST_WEBHOOK_SECRET;
   }
-  return config.STRIPE_TEST_WEBHOOK_SECRET;
+  return config.STRIPE_LIVE_WEBHOOK_SECRET;
 }
 
 let client: Stripe | undefined;
 
 export function getStripe(): Stripe {
   if (!client) {
-    client = new Stripe(getStripeTestSecretKey());
+    const secret =
+      config.NODE_ENV === "sandbox" ? getStripeTestSecretKey() : getStripeLiveSecretKey();
+    client = new Stripe(secret);
   }
   return client;
 }

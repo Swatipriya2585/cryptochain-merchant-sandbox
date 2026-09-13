@@ -136,7 +136,7 @@ export const openApiDocument = generator.generateDocument({
     title: "CryptoChain Sandbox API",
     version: "1.0.0",
     description:
-      "Flutter-facing REST API (`/api/v1`). All responses are `{ data, error }`. Authenticate with `X-API-Key`. Sandbox only: Sepolia + Stripe test mode.",
+      "Flutter-facing REST API (`/api/v1`). All responses are `{ data, error }`. Authenticate with `X-API-Key`. Sandbox: Sepolia + Stripe test mode. Production: mainnet + Stripe live, with MAX_TRANSACTION_AMOUNT enforced server-side.",
   },
   servers: [{ url: `http://localhost:${config.PORT}`, description: "Local sandbox" }],
 });

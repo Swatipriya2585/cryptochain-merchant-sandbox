@@ -43,7 +43,10 @@ export const paymentIntentListQuerySchema = paginationQuerySchema
 export const createPaymentIntentBodySchema = z
   .object({
     merchantId: z.string().min(1).openapi({ example: "merchant_sandbox_seed" }),
-    amountRequestedCrypto: z.coerce.string().min(1).openapi({ example: "0.01" }),
+    amountRequestedCrypto: z.coerce.string().min(1).openapi({
+      example: "0.01",
+      description: "ETH amount. Enforced against MAX_TRANSACTION_AMOUNT server-side.",
+    }),
     currencyCrypto: z.string().min(1).openapi({ example: "ETH" }),
     expiresInMinutes: z.coerce
       .number()
@@ -95,7 +98,7 @@ export const paymentIntentSchema = z
     expiresAt: z.string(),
     createdAt: z.string(),
     updatedAt: z.string(),
-    network: z.literal("sepolia"),
+    network: z.enum(["sepolia", "mainnet"]),
     chainId: z.number().int(),
     paymentUri: z.string(),
   })
@@ -142,7 +145,7 @@ export const paginatedPayoutsSchema = z
 export const merchantSummarySchema = z
   .object({
     merchantId: z.string(),
-    network: z.literal("sepolia"),
+    network: z.enum(["sepolia", "mainnet"]),
     totalConfirmedVolumeCrypto: z.string(),
     currencyCrypto: z.literal("ETH"),
     pendingCount: z.number().int(),

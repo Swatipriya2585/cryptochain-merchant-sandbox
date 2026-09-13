@@ -3,9 +3,10 @@ import { config } from "../config/env";
 import { logger } from "../lib/logger";
 import { prisma as defaultPrisma } from "../lib/prisma";
 import { classifyPaymentAmount, confirmationsBetween, fromWei, toWei } from "./amounts";
-import { assertConnectedToSepolia, getProvider } from "./provider";
+import { assertConnectedToConfiguredChain, getProvider } from "./provider";
 import { enqueueWebhookDelivery } from "../webhooks/dispatcher";
 import { eventTypeForStatus } from "../webhooks/event-types";
+import { enqueueOpsAlert } from "../lib/alerts";
 
 export type IncomingTransfer = {
   hash: string;
@@ -35,7 +36,7 @@ export type WatcherTickDeps = {
   toBlock?: number;
 };
 
-const POLL_INTERVAL_MS = config.NODE_ENV === "sandbox" ? config.WATCHER_POLL_INTERVAL_MS : 15_000;
+const POLL_INTERVAL_MS = config.WATCHER_POLL_INTERVAL_MS;
 
 let lastScannedBlock = 0;
 let tickInFlight = false;
@@ -360,17 +361,18 @@ export function createEthersChainReader(): ChainReader {
 }
 
 export async function startPaymentWatcher(): Promise<void> {
-  if (config.NODE_ENV !== "sandbox") {
-    logger.warn("payment watcher not started outside sandbox mode");
-    return;
-  }
-
-  await assertConnectedToSepolia();
+  await assertConnectedToConfiguredChain();
   const chain = createEthersChainReader();
   lastScannedBlock = await chain.getBlockNumber();
   logger.info(
-    { lastScannedBlock, pollIntervalMs: POLL_INTERVAL_MS },
-    "Sepolia payment watcher started",
+    {
+      lastScannedBlock,
+      pollIntervalMs: POLL_INTERVAL_MS,
+      network: config.network,
+      chainId: config.chainId,
+      requiredConfirmations: config.REQUIRED_CONFIRMATIONS,
+    },
+    "payment watcher started",
   );
 
   const provider = getProvider();
@@ -405,6 +407,12 @@ async function runScheduledTick(
     lastScannedBlock = Math.max(lastScannedBlock, toBlock);
   } catch (error) {
     logger.error({ err: error }, "payment watcher tick failed");
+    enqueueOpsAlert({
+      title: "Payment watcher tick failed",
+      body: error instanceof Error ? error.message : "payment watcher tick failed",
+      severity: "error",
+      dedupeKey: "watcher-tick-failed",
+    });
   } finally {
     tickInFlight = false;
   }
