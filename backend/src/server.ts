@@ -1,4 +1,5 @@
 import { app } from "./app";
+import { startPaymentWatcher } from "./blockchain/watcher";
 import { config } from "./config/env";
 import { logger } from "./lib/logger";
 
@@ -22,4 +23,8 @@ app.listen(config.PORT, () => {
 
   console.log(banner);
   logger.info({ mode: config.mode, chain: config.chain, port: config.PORT }, "backend started");
+
+  void startPaymentWatcher().catch((error) => {
+    logger.error({ err: error }, "failed to start Sepolia payment watcher");
+  });
 });

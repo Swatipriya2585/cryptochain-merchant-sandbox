@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import dotenv from "dotenv";
 import { z } from "zod";
+import { isMainnetRpcUrl } from "../blockchain/rpc-guards";
 
 function findRepoRoot(): string {
   let dir = __dirname;
@@ -42,15 +43,25 @@ const corsOriginSchema = z
   )
   .refine((origins) => origins.length > 0, "must include at least one origin");
 
+const watcherDefaults = {
+  REQUIRED_CONFIRMATIONS: z.coerce.number().int().positive().default(3),
+  PAYMENT_TOLERANCE_PERCENT: z.coerce.number().min(0).default(1),
+  WATCHER_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(15_000),
+};
+
 const sandboxSchema = z.object({
   NODE_ENV: z.literal("sandbox"),
   PORT: z.coerce.number().int().positive(),
   DATABASE_URL: z.string().min(1, "is missing"),
-  SEPOLIA_RPC_URL: z.string().min(1, "is missing"),
+  SEPOLIA_RPC_URL: z
+    .string()
+    .min(1, "is missing")
+    .refine((url) => !isMainnetRpcUrl(url), "must be a Sepolia RPC URL, not mainnet"),
   SEPOLIA_PRIVATE_KEY: z.string().min(1, "is missing"),
   STRIPE_TEST_SECRET_KEY: z.string().min(1, "is missing"),
   STRIPE_TEST_WEBHOOK_SECRET: z.string().min(1, "is missing"),
   CORS_ORIGIN: corsOriginSchema,
+  ...watcherDefaults,
 });
 
 const productionSchema = z.object({
@@ -62,6 +73,7 @@ const productionSchema = z.object({
   STRIPE_LIVE_SECRET_KEY: z.string().min(1, "is missing"),
   STRIPE_TEST_WEBHOOK_SECRET: z.string().min(1, "is missing"),
   CORS_ORIGIN: corsOriginSchema,
+  ...watcherDefaults,
 });
 
 function formatEnvError(error: z.ZodError): string {
@@ -79,7 +91,13 @@ function formatEnvError(error: z.ZodError): string {
   return `Invalid environment configuration. Fix the following:\n${unique.join("\n")}`;
 }
 
-export type SandboxConfig = {
+type WatcherConfig = {
+  REQUIRED_CONFIRMATIONS: number;
+  PAYMENT_TOLERANCE_PERCENT: number;
+  WATCHER_POLL_INTERVAL_MS: number;
+};
+
+export type SandboxConfig = WatcherConfig & {
   NODE_ENV: "sandbox";
   PORT: number;
   DATABASE_URL: string;
@@ -92,7 +110,7 @@ export type SandboxConfig = {
   chain: "Sepolia";
 };
 
-export type ProductionConfig = {
+export type ProductionConfig = WatcherConfig & {
   NODE_ENV: "production";
   PORT: number;
   DATABASE_URL: string;

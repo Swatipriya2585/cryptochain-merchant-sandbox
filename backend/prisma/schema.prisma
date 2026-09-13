@@ -6,3 +6,58 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+enum PaymentStatus {
+  PENDING
+  UNDERPAID
+  OVERPAID
+  CONFIRMED
+  EXPIRED
+}
+
+model PaymentIntent {
+  id                    String        @id @default(cuid())
+  merchantId            String
+  amountRequestedCrypto Decimal       @db.Decimal(36, 18)
+  currencyCrypto        String
+  expectedAddress       String
+  reference             String        @unique
+  status                PaymentStatus @default(PENDING)
+  txHash                String?       @unique
+  txBlockNumber         Int?
+  confirmations         Int           @default(0)
+  receivedAmountCrypto  Decimal?      @db.Decimal(36, 18)
+  expiresAt             DateTime
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  webhookEvents         WebhookEvent[]
+  auditLogs             AuditLog[]
+
+  @@index([status])
+  @@index([expectedAddress])
+  @@index([merchantId])
+}
+
+model WebhookEvent {
+  id              String        @id @default(cuid())
+  paymentIntentId String
+  paymentIntent   PaymentIntent @relation(fields: [paymentIntentId], references: [id], onDelete: Cascade)
+  eventType       String
+  payload         Json
+  createdAt       DateTime      @default(now())
+
+  @@index([paymentIntentId])
+}
+
+model AuditLog {
+  id              String        @id @default(cuid())
+  paymentIntentId String
+  paymentIntent   PaymentIntent @relation(fields: [paymentIntentId], references: [id], onDelete: Cascade)
+  fromStatus      String
+  toStatus        String
+  message         String
+  metadata        Json?
+  createdAt       DateTime      @default(now())
+
+  @@index([paymentIntentId])
+}

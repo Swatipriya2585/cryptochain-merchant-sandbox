@@ -4,6 +4,7 @@ import helmet from "helmet";
 import { config } from "./config/env";
 import { logger } from "./lib/logger";
 import { prisma } from "./lib/prisma";
+import { paymentIntentsRouter } from "./routes/payment-intents";
 
 export const STRIPE_WEBHOOK_PATH = "/webhooks/stripe";
 
@@ -43,3 +44,5 @@ app.get("/health", async (_req, res) => {
     dbConnected,
   });
 });
+
+app.use("/api/payment-intents", paymentIntentsRouter);
