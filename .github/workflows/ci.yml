@@ -1,0 +1,202 @@
+# CODEOWNERS-style notes for future collaborators (and future you)
+#
+# Owner today: whoever is shipping this sandbox monorepo. There is no
+# CODEOWNERS file yet — treat this header as the map of CI jobs.
+#
+# Workflow: CI (this file)
+#   Triggers: every push and every pull_request.
+#   Postgres: service container matching infra/docker-compose.yml
+#     (postgres:16, user/password/db cryptochain/cryptochain/cryptochain_sandbox).
+#     Jobs talk to it on localhost:5432 (GitHub's service network), not host 5433.
+#
+# Jobs:
+#   backend  — Node 20. npm ci, prisma migrate deploy, prisma db seed,
+#              lint, then Vitest unit + integration tests (Phases 2–6)
+#              against the ephemeral CI database.
+#              Sepolia is MOCKED (MOCK_CHAIN_PROVIDER=true). Do not call
+#              public RPCs from this job; they rate-limit and flake.
+#   frontend — Flutter stable: pub get, flutter analyze, flutter test.
+#   ci       — Always runs last. Fails the workflow if backend or frontend
+#              failed, and prints which job died so the red X is obvious.
+#              Open that job and jump to the first red step for the logs.
+#
+# Not in this file:
+#   .github/workflows/sepolia-smoke.yml — nightly + workflow_dispatch
+#   real Sepolia JSON-RPC smoke (getNetwork + getBlockNumber). Keep it
+#   off the per-commit path.
+#
+# Local equivalents:
+#   docker compose -f infra/docker-compose.yml up -d
+#   cd backend && npx prisma migrate deploy && npx prisma db seed && npm run lint && npm test
+#   cd frontend && flutter analyze && flutter test
+
+name: CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_ENV: sandbox
+  PORT: "4000"
+  # Throwaway sandbox key from .env.sandbox — never funded on mainnet.
+  SEPOLIA_PRIVATE_KEY: "0xe2e495a30f85661a44f619e3bd6e4a91b407435e18d4caa6d1d1ec7315f23640"
+  STRIPE_TEST_SECRET_KEY: sk_test_ci_placeholder
+  STRIPE_TEST_WEBHOOK_SECRET: whsec_ci_placeholder
+  CORS_ORIGIN: http://localhost:8080
+
+jobs:
+  backend:
+    name: backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+        shell: bash
+    env:
+      DATABASE_URL: postgresql://cryptochain:cryptochain@localhost:5432/cryptochain_sandbox
+      SEPOLIA_RPC_URL: https://mock.sepolia.invalid
+      MOCK_CHAIN_PROVIDER: "true"
+      SKIP_PRISMA_PRETEST: "true"
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: cryptochain
+          POSTGRES_PASSWORD: cryptochain
+          POSTGRES_DB: cryptochain_sandbox
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cryptochain -d cryptochain_sandbox"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        run: npm ci
+
+      - name: Apply Prisma migrations
+        run: npx prisma migrate deploy
+
+      - name: Seed sandbox database
+        run: npx prisma db seed
+
+      - name: Backend lint
+        run: npm run lint
+
+      - name: Backend unit + integration tests
+        run: npm test
+
+      - name: Surface backend failure
+        if: failure()
+        run: |
+          {
+            echo "## Backend job failed"
+            echo
+            echo "Open **this job** and jump to the first red step."
+            echo "Typical order: install → \`prisma migrate deploy\` → \`prisma db seed\` → lint → tests."
+            echo "Sepolia is mocked here; a real RPC failure means someone called the live provider."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::error title=Backend CI failed::Open the backend job and the first red step — its logs are at the top of that step."
+          exit 1
+
+  frontend:
+    name: frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.47.4"
+          cache: true
+
+      - name: Install Flutter packages
+        run: flutter pub get
+
+      - name: Flutter analyze
+        run: flutter analyze --no-fatal-infos
+
+      - name: Flutter tests
+        run: flutter test
+
+      - name: Surface frontend failure
+        if: failure()
+        run: |
+          {
+            echo "## Frontend job failed"
+            echo
+            echo "Open **this job** and jump to the first red step (\`flutter pub get\`, \`flutter analyze\`, or \`flutter test\`)."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::error title=Frontend CI failed::Open the frontend job and the first red step — its logs are at the top of that step."
+          exit 1
+
+  ci:
+    name: CI
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    if: always()
+    timeout-minutes: 5
+    steps:
+      - name: Surface failing jobs
+        env:
+          BACKEND: ${{ needs.backend.result }}
+          FRONTEND: ${{ needs.frontend.result }}
+        run: |
+          set -euo pipefail
+          {
+            echo "# CI"
+            echo
+            echo "| Job | Result |"
+            echo "| --- | --- |"
+            echo "| backend | \`${BACKEND}\` |"
+            echo "| frontend | \`${FRONTEND}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          failed=()
+          if [[ "${BACKEND}" != "success" ]]; then
+            failed+=("backend (${BACKEND})")
+          fi
+          if [[ "${FRONTEND}" != "success" ]]; then
+            failed+=("frontend (${FRONTEND})")
+          fi
+
+          if ((${#failed[@]} > 0)); then
+            echo "::error title=CI failed::Failed jobs: ${failed[*]}. Open the first red job; the first red step has the logs at the top."
+            {
+              echo
+              echo "**Failed:** ${failed[*]}"
+              echo
+              echo "Open that job and the first red step. GitHub pins the failed step at the top of the job log."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          echo "All CI jobs succeeded." >> "$GITHUB_STEP_SUMMARY"

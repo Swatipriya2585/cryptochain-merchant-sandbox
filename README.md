@@ -83,6 +83,7 @@ The API listens on `PORT` from `.env.sandbox` (default `http://localhost:4000`).
 | `npm test` | Unit tests |
 | `npm run lint` | ESLint + Prettier check |
 | `npm run sandbox:seed` | Seed demo merchant + intents for `/api/v1` |
+| `npm run sepolia:smoke` | Real Sepolia JSON-RPC smoke (nightly CI) |
 
 Smoke check:
 
@@ -92,6 +93,17 @@ curl http://localhost:4000/health
 ```
 
 The backend loads environment variables from the repo-root `.env.sandbox` file.
+
+
+## CI
+
+Every push and pull request runs [`.github/workflows/ci.yml`](.github/workflows/ci.yml):
+
+1. **backend** — Postgres 16 service container (same user/password/database as `infra/docker-compose.yml`, on port 5432 inside the job). `npm ci`, `prisma migrate deploy`, `prisma db seed`, lint, then Vitest unit + integration tests. Sepolia is **mocked** (`MOCK_CHAIN_PROVIDER=true`) so public RPCs cannot flake the build.
+2. **frontend** — `flutter pub get`, `flutter analyze`, `flutter test`.
+3. **CI** — fails the workflow if either job failed, and writes the failing job name to the GitHub Actions summary. Open that job; the first red step has the logs.
+
+A separate [`.github/workflows/sepolia-smoke.yml`](.github/workflows/sepolia-smoke.yml) job hits a real Sepolia RPC nightly (and on `workflow_dispatch`). Do not add that call to the per-commit workflow.
 
 ## Stripe test-mode payouts (INR / merchant fiat leg)
 

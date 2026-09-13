@@ -4,7 +4,8 @@ import { defineConfig } from "vitest/config";
 
 dotenv.config({
   path: path.resolve(__dirname, "../.env.sandbox"),
-  override: true,
+  // Preserve GitHub Actions DATABASE_URL / MOCK_CHAIN_PROVIDER for the CI Postgres.
+  override: process.env.CI !== "true",
 });
 process.env.NODE_ENV = "sandbox";
 

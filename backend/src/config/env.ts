@@ -25,8 +25,11 @@ function loadEnvFile(): void {
   }
 
   // Vitest sets NODE_ENV=test; still load sandbox secrets and pin mode to sandbox.
+  // GitHub Actions sets CI=true and injects DATABASE_URL for the service container
+  // (port 5432). Do not let .env.sandbox (host port 5433) override those values.
   const runningTests = process.env.NODE_ENV === "test" || process.env.VITEST === "true";
-  dotenv.config({ path: sandboxPath, override: runningTests });
+  const overrideFromFile = runningTests && process.env.CI !== "true";
+  dotenv.config({ path: sandboxPath, override: overrideFromFile });
   if (runningTests) {
     process.env.NODE_ENV = "sandbox";
   }

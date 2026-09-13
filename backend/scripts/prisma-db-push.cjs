@@ -6,6 +6,11 @@ require("dotenv").config({
   path: path.resolve(__dirname, "../../.env.sandbox"),
 });
 
+if (process.env.SKIP_PRISMA_PRETEST === "true") {
+  console.log("SKIP_PRISMA_PRETEST=true — schema already applied via prisma migrate deploy");
+  process.exit(0);
+}
+
 if (!process.env.DATABASE_URL) {
   console.error("DATABASE_URL is missing; cannot push Prisma schema.");
   process.exit(1);

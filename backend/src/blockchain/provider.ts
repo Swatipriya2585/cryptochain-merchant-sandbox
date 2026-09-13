@@ -1,8 +1,53 @@
-import { JsonRpcProvider, Wallet, type Provider } from "ethers";
+import { JsonRpcProvider, Network, Wallet, type Provider } from "ethers";
 import { config } from "../config/env";
 import { assertSandboxRpcUrl, isMainnetRpcUrl } from "./rpc-guards";
 
 const SEPOLIA_CHAIN_ID = 11155111n;
+const MOCK_SEPOLIA_HEAD_BLOCK = 9_000_000;
+
+let provider: JsonRpcProvider | undefined;
+let wallet: Wallet | undefined;
+
+export function isMockChainProviderEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.MOCK_CHAIN_PROVIDER === "true";
+}
+
+/**
+ * In-process Sepolia stand-in for per-commit CI. Never opens a socket.
+ * Nightly smoke uses a real RPC and must not set MOCK_CHAIN_PROVIDER.
+ */
+export function createMockSepoliaProvider(): JsonRpcProvider {
+  const sepolia = Network.from(SEPOLIA_CHAIN_ID);
+  const mock = new JsonRpcProvider("https://mock.sepolia.invalid", sepolia, {
+    staticNetwork: sepolia,
+  });
+  mock.send = async (method: string): Promise<unknown> => {
+    switch (method) {
+      case "eth_chainId":
+        return "0xaa36a7";
+      case "eth_blockNumber":
+        return `0x${MOCK_SEPOLIA_HEAD_BLOCK.toString(16)}`;
+      case "eth_getBlockByNumber":
+      case "eth_getBlockByHash":
+        return null;
+      case "eth_getLogs":
+        return [];
+      case "eth_getTransactionByHash":
+      case "eth_getTransactionReceipt":
+        return null;
+      case "net_version":
+        return "11155111";
+      default:
+        throw new Error(`MOCK_CHAIN_PROVIDER blocked JSON-RPC method ${method}`);
+    }
+  };
+  return mock;
+}
+
+export function resetProviderCacheForTests(): void {
+  provider = undefined;
+  wallet = undefined;
+}
 
 function requireTestnetContext(): void {
   if (config.NODE_ENV === "sandbox") {
@@ -25,9 +70,6 @@ function normalizePrivateKey(key: string): string {
   return key.startsWith("0x") ? key : `0x${key}`;
 }
 
-let provider: JsonRpcProvider | undefined;
-let wallet: Wallet | undefined;
-
 export function getSepoliaRpcUrl(): string {
   requireTestnetContext();
   if (config.NODE_ENV !== "sandbox") {
@@ -39,9 +81,13 @@ export function getSepoliaRpcUrl(): string {
 export function getProvider(): JsonRpcProvider {
   requireTestnetContext();
   if (!provider) {
-    // Do not pin staticNetwork: getNetwork() must observe the real chain id so a
-    // mainnet endpoint cannot hide behind a Sepolia label.
-    provider = new JsonRpcProvider(getSepoliaRpcUrl());
+    if (isMockChainProviderEnabled()) {
+      provider = createMockSepoliaProvider();
+    } else {
+      // Do not pin staticNetwork: getNetwork() must observe the real chain id so a
+      // mainnet endpoint cannot hide behind a Sepolia label.
+      provider = new JsonRpcProvider(getSepoliaRpcUrl());
+    }
   }
   return provider;
 }

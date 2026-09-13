@@ -16,7 +16,8 @@
     "pretest": "node scripts/prisma-db-push.cjs",
     "prisma:push": "node scripts/prisma-db-push.cjs",
     "sandbox:trigger-event": "tsx src/webhooks/trigger-event-cli.ts",
-    "sandbox:seed": "tsx src/db/seed-sandbox-cli.ts"
+    "sandbox:seed": "tsx src/db/seed-sandbox-cli.ts",
+    "sepolia:smoke": "tsx src/blockchain/sepolia-smoke.ts"
   },
   "engines": {
     "node": ">=20"
@@ -53,5 +54,8 @@
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.43.0",
     "vitest": "^3.2.4"
+  },
+  "prisma": {
+    "seed": "tsx src/db/seed-sandbox-cli.ts"
   }
 }
