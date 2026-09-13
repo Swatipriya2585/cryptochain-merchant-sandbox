@@ -22,6 +22,7 @@ model Merchant {
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   paymentIntents PaymentIntent[]
+  payouts        Payout[]
 }
 
 model PaymentIntent {
@@ -42,6 +43,7 @@ model PaymentIntent {
   updatedAt             DateTime       @updatedAt
   webhookEvents         WebhookEvent[]
   auditLogs             AuditLog[]
+  payout                Payout?
 
   @@index([status])
   @@index([expectedAddress])
@@ -78,4 +80,32 @@ model AuditLog {
   createdAt       DateTime      @default(now())
 
   @@index([paymentIntentId])
+}
+
+
+enum PayoutStatus {
+  PENDING
+  PAID
+  FAILED
+}
+
+model Payout {
+  id                    String       @id @default(cuid())
+  paymentIntentId       String       @unique
+  paymentIntent         PaymentIntent @relation(fields: [paymentIntentId], references: [id], onDelete: Cascade)
+  merchantId            String
+  merchant              Merchant     @relation(fields: [merchantId], references: [id], onDelete: Restrict)
+  amountFiat            Decimal      @db.Decimal(18, 2)
+  currencyFiat          String       @default("INR")
+  status                PayoutStatus @default(PENDING)
+  stripePayoutId        String?      @unique
+  stripePaymentIntentId String?      @unique
+  lastStripeEventType   String?
+  simulated             Boolean      @default(true)
+  paidAt                DateTime?
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  @@index([merchantId])
+  @@index([status])
 }

@@ -1,3 +1,4 @@
+const fs = require("node:fs");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 
@@ -24,9 +25,18 @@ const run = (args) => {
 
 run(["generate"]);
 
-const migration = path.resolve(
-  __dirname,
-  "../prisma/migrations/20260913120000_merchant_webhooks/migration.sql",
-);
-run(["db", "execute", "--file", migration, "--schema", "prisma/schema.prisma"]);
+const migrationsDir = path.resolve(__dirname, "../prisma/migrations");
+const dirs = fs
+  .readdirSync(migrationsDir, { withFileTypes: true })
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => entry.name)
+  .sort();
+
+for (const dir of dirs) {
+  const file = path.join(migrationsDir, dir, "migration.sql");
+  if (fs.existsSync(file)) {
+    run(["db", "execute", "--file", file, "--schema", "prisma/schema.prisma"]);
+  }
+}
+
 run(["db", "push", "--skip-generate"]);

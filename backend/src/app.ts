@@ -6,9 +6,11 @@ import { logger } from "./lib/logger";
 import { prisma } from "./lib/prisma";
 import { merchantsRouter } from "./routes/merchants";
 import { paymentIntentsRouter } from "./routes/payment-intents";
+import { payoutsRouter } from "./routes/payouts";
+import { stripeWebhooksRouter } from "./routes/stripe-webhooks";
 import { webhookEventsRouter } from "./routes/webhook-events";
 
-export const STRIPE_WEBHOOK_PATH = "/webhooks/stripe";
+export const STRIPE_WEBHOOK_PATH = "/api/webhooks/stripe";
 
 export const app = express();
 
@@ -49,4 +51,6 @@ app.get("/health", async (_req, res) => {
 
 app.use("/api/merchants", merchantsRouter);
 app.use("/api/payment-intents", paymentIntentsRouter);
+app.use("/api/payouts", payoutsRouter);
 app.use("/api/webhook-events", webhookEventsRouter);
+app.use(STRIPE_WEBHOOK_PATH, stripeWebhooksRouter);
