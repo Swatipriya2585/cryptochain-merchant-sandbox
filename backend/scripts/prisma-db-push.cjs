@@ -11,16 +11,22 @@ if (!process.env.DATABASE_URL) {
 }
 
 const prismaCli = path.resolve(__dirname, "../node_modules/prisma/build/index.js");
-const generate = spawnSync(process.execPath, [prismaCli, "generate"], {
-  stdio: "inherit",
-  env: process.env,
-});
-if (generate.status) {
-  process.exit(generate.status);
-}
+const run = (args) => {
+  const result = spawnSync(process.execPath, [prismaCli, ...args], {
+    stdio: "inherit",
+    env: process.env,
+    cwd: path.resolve(__dirname, ".."),
+  });
+  if (result.status) {
+    process.exit(result.status);
+  }
+};
 
-const push = spawnSync(process.execPath, [prismaCli, "db", "push", "--skip-generate"], {
-  stdio: "inherit",
-  env: process.env,
-});
-process.exit(push.status ?? 1);
+run(["generate"]);
+
+const migration = path.resolve(
+  __dirname,
+  "../prisma/migrations/20260913120000_merchant_webhooks/migration.sql",
+);
+run(["db", "execute", "--file", migration, "--schema", "prisma/schema.prisma"]);
+run(["db", "push", "--skip-generate"]);

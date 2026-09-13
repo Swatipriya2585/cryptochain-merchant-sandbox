@@ -15,21 +15,31 @@ enum PaymentStatus {
   EXPIRED
 }
 
+model Merchant {
+  id             String          @id
+  webhookUrl     String?
+  webhookSecret  String
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  paymentIntents PaymentIntent[]
+}
+
 model PaymentIntent {
-  id                    String        @id @default(cuid())
+  id                    String         @id @default(cuid())
   merchantId            String
-  amountRequestedCrypto Decimal       @db.Decimal(36, 18)
+  merchant              Merchant       @relation(fields: [merchantId], references: [id], onDelete: Restrict)
+  amountRequestedCrypto Decimal        @db.Decimal(36, 18)
   currencyCrypto        String
   expectedAddress       String
-  reference             String        @unique
-  status                PaymentStatus @default(PENDING)
-  txHash                String?       @unique
+  reference             String         @unique
+  status                PaymentStatus  @default(PENDING)
+  txHash                String?        @unique
   txBlockNumber         Int?
-  confirmations         Int           @default(0)
-  receivedAmountCrypto  Decimal?      @db.Decimal(36, 18)
+  confirmations         Int            @default(0)
+  receivedAmountCrypto  Decimal?       @db.Decimal(36, 18)
   expiresAt             DateTime
-  createdAt             DateTime      @default(now())
-  updatedAt             DateTime      @updatedAt
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
   webhookEvents         WebhookEvent[]
   auditLogs             AuditLog[]
 
@@ -39,14 +49,22 @@ model PaymentIntent {
 }
 
 model WebhookEvent {
-  id              String        @id @default(cuid())
-  paymentIntentId String
-  paymentIntent   PaymentIntent @relation(fields: [paymentIntentId], references: [id], onDelete: Cascade)
-  eventType       String
-  payload         Json
-  createdAt       DateTime      @default(now())
+  id                    String        @id @default(cuid())
+  paymentIntentId       String
+  paymentIntent         PaymentIntent @relation(fields: [paymentIntentId], references: [id], onDelete: Cascade)
+  eventType             String
+  payload               Json
+  deliveredSuccessfully Boolean       @default(false)
+  attempts              Int           @default(0)
+  lastHttpStatus        Int?
+  lastError             String?
+  lastAttemptAt         DateTime?
+  nextAttemptAt         DateTime?
+  createdAt             DateTime      @default(now())
 
   @@index([paymentIntentId])
+  @@index([deliveredSuccessfully])
+  @@index([eventType])
 }
 
 model AuditLog {

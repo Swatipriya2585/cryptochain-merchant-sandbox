@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { PaymentStatus } from "@prisma/client";
 import { config } from "../config/env";
 import { prisma } from "../lib/prisma";
+import { ensureMerchant } from "./merchants";
 import { toWei } from "../blockchain/amounts";
 import { getSharedReceiveAddress, SEPOLIA_CHAIN_ID_NUMBER } from "../blockchain/provider";
 
@@ -34,6 +35,8 @@ export async function createPaymentIntent(input: CreatePaymentIntentInput) {
   if (amountWei <= 0n) {
     throw new Error("amountRequestedCrypto must be greater than zero.");
   }
+
+  await ensureMerchant(input.merchantId);
 
   const expectedAddress = getSharedReceiveAddress();
   const reference = `cc_${randomBytes(8).toString("hex")}`;

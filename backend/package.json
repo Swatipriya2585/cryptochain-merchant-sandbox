@@ -2,7 +2,7 @@
   "name": "cryptochain-sandbox-backend",
   "version": "0.1.0",
   "private": true,
-  "description": "CryptoChain sandbox backend — Node.js, TypeScript, Express. Sepolia and Stripe test mode only.",
+  "description": "CryptoChain sandbox backend \u2014 Node.js, TypeScript, Express. Sepolia and Stripe test mode only.",
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
@@ -14,7 +14,8 @@
     "prisma:generate": "node scripts/prisma-generate.cjs",
     "sandbox:fund": "tsx src/blockchain/faucet-helper.ts",
     "pretest": "node scripts/prisma-db-push.cjs",
-    "prisma:push": "node scripts/prisma-db-push.cjs"
+    "prisma:push": "node scripts/prisma-db-push.cjs",
+    "sandbox:trigger-event": "tsx src/webhooks/trigger-event-cli.ts"
   },
   "engines": {
     "node": ">=20"

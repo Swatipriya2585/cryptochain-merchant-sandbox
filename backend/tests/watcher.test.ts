@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { ChainReader } from "../src/blockchain/watcher";
 import { runWatcherTick } from "../src/blockchain/watcher";
 import { prisma } from "../src/lib/prisma";
+import { ensureMerchant } from "../src/services/merchants";
 
 describe("payment watcher", () => {
   const expectedAddress = "0x00000000000000000000000000000000000000aA";
@@ -14,6 +15,7 @@ describe("payment watcher", () => {
     await prisma.webhookEvent.deleteMany();
     await prisma.auditLog.deleteMany();
     await prisma.paymentIntent.deleteMany();
+    await ensureMerchant("merchant_test");
   });
 
   afterAll(async () => {
@@ -71,7 +73,7 @@ describe("payment watcher", () => {
       where: { paymentIntentId: intent.id },
     });
     expect(webhookEvents).toHaveLength(1);
-    expect(webhookEvents[0]?.eventType).toBe("payment_intent.confirmed");
+    expect(webhookEvents[0]?.eventType).toBe("payment_intent.succeeded");
 
     const auditLogs = await prisma.auditLog.findMany({ where: { paymentIntentId: intent.id } });
     expect(auditLogs).toHaveLength(1);

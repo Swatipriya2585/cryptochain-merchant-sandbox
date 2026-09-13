@@ -4,7 +4,9 @@ import helmet from "helmet";
 import { config } from "./config/env";
 import { logger } from "./lib/logger";
 import { prisma } from "./lib/prisma";
+import { merchantsRouter } from "./routes/merchants";
 import { paymentIntentsRouter } from "./routes/payment-intents";
+import { webhookEventsRouter } from "./routes/webhook-events";
 
 export const STRIPE_WEBHOOK_PATH = "/webhooks/stripe";
 
@@ -45,4 +47,6 @@ app.get("/health", async (_req, res) => {
   });
 });
 
+app.use("/api/merchants", merchantsRouter);
 app.use("/api/payment-intents", paymentIntentsRouter);
+app.use("/api/webhook-events", webhookEventsRouter);

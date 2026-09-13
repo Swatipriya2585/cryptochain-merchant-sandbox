@@ -4,6 +4,8 @@ import { logger } from "../lib/logger";
 import { prisma as defaultPrisma } from "../lib/prisma";
 import { classifyPaymentAmount, confirmationsBetween, fromWei, toWei } from "./amounts";
 import { assertConnectedToSepolia, getProvider } from "./provider";
+import { enqueueWebhookDelivery } from "../webhooks/dispatcher";
+import { eventTypeForStatus } from "../webhooks/event-types";
 
 export type IncomingTransfer = {
   hash: string;
@@ -72,8 +74,8 @@ async function recordTransition(
     ...extra,
   };
 
-  await db.$transaction([
-    db.paymentIntent.update({
+  const event = await db.$transaction(async (tx) => {
+    await tx.paymentIntent.update({
       where: { id: intent.id },
       data: {
         status: toStatus,
@@ -87,15 +89,15 @@ async function recordTransition(
         txBlockNumber:
           typeof extra.txBlockNumber === "number" ? extra.txBlockNumber : intent.txBlockNumber,
       },
-    }),
-    db.webhookEvent.create({
+    });
+    const created = await tx.webhookEvent.create({
       data: {
         paymentIntentId: intent.id,
-        eventType: `payment_intent.${toStatus.toLowerCase()}`,
+        eventType: eventTypeForStatus(toStatus),
         payload,
       },
-    }),
-    db.auditLog.create({
+    });
+    await tx.auditLog.create({
       data: {
         paymentIntentId: intent.id,
         fromStatus: intent.status,
@@ -103,8 +105,11 @@ async function recordTransition(
         message,
         metadata: payload,
       },
-    }),
-  ]);
+    });
+    return created;
+  });
+
+  enqueueWebhookDelivery(event.id);
 }
 
 function pickTransferForIntent(
