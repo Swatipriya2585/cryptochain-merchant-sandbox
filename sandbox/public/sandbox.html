@@ -150,7 +150,8 @@
     #app { display: none; }
     body.logged-out #gate { display: block; }
     body.logged-in #app { display: block; }
-    body.logged-in .hero, body.logged-in #marketing { display: none; }
+    body.logged-in .hero, body.logged-in #marketing, body.logged-in #sandbox-api-docs { display: none; }
+    body.logged-in #console { padding-top: 28px; max-width: 920px; }
     @media (max-width: 700px) {
       nav .hide { display: none; }
       .row, .row3 { grid-template-columns: 1fr; }
