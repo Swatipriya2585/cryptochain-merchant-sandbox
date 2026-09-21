@@ -16,41 +16,19 @@ class WalletsScreen extends ConsumerStatefulWidget {
   ConsumerState<WalletsScreen> createState() => _WalletsScreenState();
 }
 
-class _WalletsScreenState extends ConsumerState<WalletsScreen>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabs;
+class _WalletsScreenState extends ConsumerState<WalletsScreen> {
+  int _networkIndex = 0;
   bool _allAssets = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabs = TabController(length: _networks.length, vsync: this);
-    _tabs.addListener(() => setState(() {}));
-  }
-
-  @override
-  void dispose() {
-    _tabs.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
     final sandbox = ref.watch(isSandboxProvider);
     final state = ref.watch(sandboxStoreProvider);
-    final network = _networks[_tabs.index];
+    final network = _networks[_networkIndex];
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Wallets'),
-        bottom: TabBar(
-          controller: _tabs,
-          tabs: const [
-            Tab(text: 'Ethereum'),
-            Tab(text: 'Base'),
-            Tab(text: 'Polygon'),
-          ],
-        ),
         actions: [
           TextButton(
             onPressed: () => setState(() => _allAssets = !_allAssets),
@@ -72,6 +50,18 @@ class _WalletsScreenState extends ConsumerState<WalletsScreen>
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    for (var i = 0; i < _networks.length; i++)
+                      ChoiceChip(
+                        label: Text(_networks[i][0].toUpperCase() + _networks[i].substring(1)),
+                        selected: _networkIndex == i,
+                        onSelected: (_) => setState(() => _networkIndex = i),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 16),
                 Text(
                   'Default wallet · ${network[0].toUpperCase()}${network.substring(1)}',
                   style: Theme.of(context).textTheme.titleSmall,
@@ -174,13 +164,14 @@ class _WalletCard extends ConsumerWidget {
               ),
             Wrap(
               spacing: 8,
+              runSpacing: 8,
               children: [
                 FilledButton.tonalIcon(
                   onPressed: () => _send(context, ref),
                   icon: const Icon(Icons.north_east),
                   label: const Text('Send money'),
                 ),
-                FilledButton.tonalIcon(
+                FilledButton.icon(
                   onPressed: () => _receive(context),
                   icon: const Icon(Icons.south_west),
                   label: const Text('Receive money'),

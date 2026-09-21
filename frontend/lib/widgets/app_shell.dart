@@ -66,11 +66,18 @@ class AppShell extends StatelessWidget {
           child: ListView(
             children: [
               for (var i = 0; i < _destinations.length; i++)
-                ListTile(
-                  leading: Icon(_destinations[i].icon),
-                  title: Text(_destinations[i].label),
-                  selected: i == index,
-                  onTap: () => goTo(i),
+                Material(
+                  color: i == index
+                      ? Theme.of(context).colorScheme.primaryContainer
+                      : Colors.transparent,
+                  child: InkWell(
+                    onTap: () => goTo(i),
+                    child: ListTile(
+                      leading: Icon(_destinations[i].icon),
+                      title: Text(_destinations[i].label),
+                      selected: i == index,
+                    ),
+                  ),
                 ),
             ],
           ),

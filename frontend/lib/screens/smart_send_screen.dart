@@ -50,27 +50,24 @@ class _SmartSendScreenState extends ConsumerState<SmartSendScreen> {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                Stepper(
-                  currentStep: _step.clamp(0, 2),
-                  controlsBuilder: (context, details) => const SizedBox.shrink(),
-                  steps: [
-                    Step(
-                      title: const Text('Quote'),
-                      isActive: _step >= 0,
-                      content: _quoteForm(state),
-                    ),
-                    Step(
-                      title: const Text('Review'),
-                      isActive: _step >= 1,
-                      content: _review(),
-                    ),
-                    Step(
-                      title: const Text('Finality'),
-                      isActive: _step >= 2,
-                      content: _finality(),
-                    ),
+                Text(
+                  'Quote → Review → Finality (mock router only — no LI.FI, Uniswap, Jupiter, or RPC).',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    _PhaseChip(label: 'Quote', active: _step == 0, done: _step > 0),
+                    const Icon(Icons.chevron_right),
+                    _PhaseChip(label: 'Review', active: _step == 1, done: _step > 1),
+                    const Icon(Icons.chevron_right),
+                    _PhaseChip(label: 'Finality', active: _step == 2, done: _completed != null),
                   ],
                 ),
+                const SizedBox(height: 16),
+                if (_step == 0) _quoteForm(state),
+                if (_step == 1) _review(),
+                if (_step == 2) _finality(),
                 const SizedBox(height: 24),
                 Text('Smart Send activity', style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 8),
@@ -94,6 +91,7 @@ class _SmartSendScreenState extends ConsumerState<SmartSendScreen> {
   Widget _quoteForm(SandboxState state) {
     final wallet = state.walletById(_walletId ?? '');
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         DropdownButtonFormField<String>(
           key: ValueKey(_walletId),
@@ -106,35 +104,27 @@ class _SmartSendScreenState extends ConsumerState<SmartSendScreen> {
           onChanged: (value) => setState(() => _walletId = value),
         ),
         const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: DropdownButtonFormField<String>(
-                initialValue: _from,
-                decoration: const InputDecoration(labelText: 'From', border: OutlineInputBorder()),
-                items: [
-                  for (final symbol in {
-                    ...?wallet?.assets.map((asset) => asset.symbol),
-                    ...state.coins.map((coin) => coin.symbol),
-                  })
-                    DropdownMenuItem(value: symbol, child: Text(symbol)),
-                ],
-                onChanged: (value) => setState(() => _from = value ?? _from),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: DropdownButtonFormField<String>(
-                initialValue: _to,
-                decoration: const InputDecoration(labelText: 'To', border: OutlineInputBorder()),
-                items: [
-                  for (final coin in state.coins)
-                    DropdownMenuItem(value: coin.symbol, child: Text(coin.symbol)),
-                ],
-                onChanged: (value) => setState(() => _to = value ?? _to),
-              ),
-            ),
+        DropdownButtonFormField<String>(
+          initialValue: _from,
+          decoration: const InputDecoration(labelText: 'From', border: OutlineInputBorder()),
+          items: [
+            for (final symbol in {
+              ...?wallet?.assets.map((asset) => asset.symbol),
+              ...state.coins.map((coin) => coin.symbol),
+            })
+              DropdownMenuItem(value: symbol, child: Text(symbol)),
           ],
+          onChanged: (value) => setState(() => _from = value ?? _from),
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          initialValue: _to,
+          decoration: const InputDecoration(labelText: 'To', border: OutlineInputBorder()),
+          items: [
+            for (final coin in state.coins)
+              DropdownMenuItem(value: coin.symbol, child: Text(coin.symbol)),
+          ],
+          onChanged: (value) => setState(() => _to = value ?? _to),
         ),
         const SizedBox(height: 12),
         TextField(
@@ -150,7 +140,10 @@ class _SmartSendScreenState extends ConsumerState<SmartSendScreen> {
         const SizedBox(height: 16),
         FilledButton(
           onPressed: _busy ? null : _fetchQuote,
-          child: const Text('Start Smart Send'),
+          child: const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Text('Start Smart Send'),
+          ),
         ),
       ],
     );
@@ -162,7 +155,7 @@ class _SmartSendScreenState extends ConsumerState<SmartSendScreen> {
       return const Text('Request a quote to continue.');
     }
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text('Rate: 1 ${quote.fromSymbol} = ${quote.exchangeRate} ${quote.toSymbol}'),
         Text('You send: ${quote.amount} ${quote.fromSymbol}'),
@@ -172,7 +165,14 @@ class _SmartSendScreenState extends ConsumerState<SmartSendScreen> {
         const SizedBox(height: 16),
         FilledButton(
           onPressed: _busy ? null : _confirm,
-          child: const Text('Review & confirm'),
+          child: const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Text('Review & confirm'),
+          ),
+        ),
+        TextButton(
+          onPressed: _busy ? null : () => setState(() => _step = 0),
+          child: const Text('Back to quote'),
         ),
       ],
     );
@@ -215,21 +215,29 @@ class _SmartSendScreenState extends ConsumerState<SmartSendScreen> {
   Future<void> _fetchQuote() async {
     final amount = double.tryParse(_amount.text) ?? 0;
     if (_walletId == null || amount <= 0 || _recipient.text.trim().isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Choose a wallet, amount, and recipient')),
+      );
       return;
     }
     setState(() => _busy = true);
-    final quote = await ref.read(sandboxStoreProvider.notifier).quote(
-      walletId: _walletId!,
-      fromSymbol: _from,
-      toSymbol: _to,
-      amount: amount,
-      recipient: _recipient.text.trim(),
-    );
-    setState(() {
-      _quote = quote;
-      _step = 1;
-      _busy = false;
-    });
+    try {
+      final quote = await ref.read(sandboxStoreProvider.notifier).quote(
+        walletId: _walletId!,
+        fromSymbol: _from,
+        toSymbol: _to,
+        amount: amount,
+        recipient: _recipient.text.trim(),
+      );
+      if (!mounted) return;
+      setState(() {
+        _quote = quote;
+        _step = 1;
+      });
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   Future<void> _confirm() async {
@@ -239,12 +247,34 @@ class _SmartSendScreenState extends ConsumerState<SmartSendScreen> {
       _busy = true;
       _step = 2;
     });
-    await Future<void>.delayed(ref.read(smartSendFinalityDelayProvider));
-    final activity = await ref.read(sandboxStoreProvider.notifier).completeSmartSend(quote);
-    if (!mounted) return;
-    setState(() {
-      _completed = activity;
-      _busy = false;
-    });
+    try {
+      await Future<void>.delayed(ref.read(smartSendFinalityDelayProvider));
+      final activity = await ref.read(sandboxStoreProvider.notifier).completeSmartSend(quote);
+      if (!mounted) return;
+      setState(() => _completed = activity);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+}
+
+class _PhaseChip extends StatelessWidget {
+  const _PhaseChip({required this.label, required this.active, required this.done});
+
+  final String label;
+  final bool active;
+  final bool done;
+
+  @override
+  Widget build(BuildContext context) {
+    return Chip(
+      label: Text(label),
+      avatar: Icon(
+        done ? Icons.check_circle : Icons.circle_outlined,
+        size: 16,
+        color: active ? Theme.of(context).colorScheme.primary : null,
+      ),
+      color: active ? WidgetStatePropertyAll(Theme.of(context).colorScheme.primaryContainer) : null,
+    );
   }
 }
