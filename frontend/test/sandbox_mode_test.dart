@@ -6,6 +6,7 @@ import 'package:cryptochain_merchant/sandbox/store.dart';
 import 'package:cryptochain_merchant/providers/merchant_mode_controller.dart';
 import 'package:cryptochain_merchant/screens/dashboard_home_screen.dart';
 import 'package:cryptochain_merchant/screens/smart_send_screen.dart';
+import 'package:cryptochain_merchant/screens/wallets_screen.dart';
 import 'package:cryptochain_merchant/widgets/mode_toggle.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -126,6 +127,29 @@ void main() {
     await tester.tap(confirm);
     await tester.pumpAndSettle();
     expect(find.textContaining('Tx hash: 0xsandbox'), findsOneWidget);
+  });
+
+  testWidgets('sandbox wallet receive dialog shows the mock address', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 2400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          merchantModeProvider.overrideWith(_SandboxMode.new),
+          isSandboxProvider.overrideWith((ref) => true),
+        ],
+        child: const MaterialApp(home: WalletsScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sandbox Treasury'), findsWidgets);
+    await tester.ensureVisible(find.text('Receive money'));
+    await tester.tap(find.text('Receive money'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('0xSANDBOX'), findsWidgets);
+    expect(find.text('Copy address'), findsOneWidget);
   });
 }
 

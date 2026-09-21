@@ -112,7 +112,7 @@ class SandboxStore extends Notifier<SandboxState> {
       amountUsd: amount * (wallet?.assets.where((a) => a.symbol == symbol).firstOrNull?.usdPrice ?? 1),
       status: 'confirmed',
       createdAt: DateTime.now(),
-      txHash: '0xsandbox${rng.nextInt(1 << 20).toRadixString(16).padLeft(20, '0')}',
+      txHash: '0xsandbox${rng.hex(24)}',
       counterparty: recipient,
     );
     state = state.copyWith(
@@ -242,7 +242,7 @@ class SandboxStore extends Notifier<SandboxState> {
       toSymbol: quote.toSymbol,
       amount: quote.amount,
       recipient: quote.recipient,
-      txHash: '0xsandbox${rng.nextInt(1 << 24).toRadixString(16).padLeft(24, '0')}',
+      txHash: '0xsandbox${rng.hex(24)}',
       route: quote.route,
       createdAt: DateTime.now(),
       status: 'completed',

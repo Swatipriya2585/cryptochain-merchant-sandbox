@@ -17,4 +17,9 @@ class SeededRandom {
   double range(double min, double max) => min + nextDouble() * (max - min);
 
   T pick<T>(List<T> items) => items[nextInt(items.length)];
+
+  String hex(int length) {
+    const chars = '0123456789abcdef';
+    return List.generate(length, (_) => chars[nextInt(chars.length)]).join();
+  }
 }

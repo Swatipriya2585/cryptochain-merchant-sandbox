@@ -162,20 +162,22 @@ class _WalletCard extends ConsumerWidget {
                 subtitle: Text('${asset.name} · ${asset.network}'),
                 trailing: Text(formatUsd(asset.usdValue)),
               ),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
+            const SizedBox(height: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 FilledButton.tonalIcon(
                   onPressed: () => _send(context, ref),
                   icon: const Icon(Icons.north_east),
                   label: const Text('Send money'),
                 ),
+                const SizedBox(height: 8),
                 FilledButton.icon(
                   onPressed: () => _receive(context),
                   icon: const Icon(Icons.south_west),
                   label: const Text('Receive money'),
                 ),
+                const SizedBox(height: 8),
                 OutlinedButton.icon(
                   onPressed: () => _details(context, ref),
                   icon: const Icon(Icons.info_outline),
@@ -271,26 +273,41 @@ class _WalletCard extends ConsumerWidget {
   Future<void> _receive(BuildContext context) async {
     await showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Receive money'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            QrImageView(data: wallet.address, size: 180, backgroundColor: Colors.white),
-            const SizedBox(height: 12),
-            SelectableText(wallet.address),
-          ],
-        ),
-        actions: [
-          TextButton.icon(
-            onPressed: () async {
-              await Clipboard.setData(ClipboardData(text: wallet.address));
-              if (context.mounted) Navigator.pop(context);
-            },
-            icon: const Icon(Icons.copy),
-            label: const Text('Copy address'),
+      useRootNavigator: true,
+      builder: (context) => Dialog(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Receive money', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: 180,
+                height: 180,
+                child: ColoredBox(
+                  color: Colors.white,
+                  child: QrImageView(
+                    data: wallet.address,
+                    size: 180,
+                    backgroundColor: Colors.white,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SelectableText(wallet.address),
+              const SizedBox(height: 16),
+              TextButton.icon(
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: wallet.address));
+                  if (context.mounted) Navigator.pop(context);
+                },
+                icon: const Icon(Icons.copy),
+                label: const Text('Copy address'),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -298,6 +315,7 @@ class _WalletCard extends ConsumerWidget {
   Future<void> _details(BuildContext context, WidgetRef ref) async {
     await showDialog<void>(
       context: context,
+      useRootNavigator: true,
       builder: (context) => AlertDialog(
         title: Text(wallet.name),
         content: Column(
