@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../data/models/payment_intent.dart';
+import '../providers/merchant_mode_controller.dart';
 import '../providers/payments_providers.dart';
+import '../sandbox/merchant_mode.dart';
 import '../widgets/error_panel.dart';
 import '../widgets/status_chip.dart';
 
@@ -50,6 +52,8 @@ class PaymentIntentListScreen extends ConsumerWidget {
               error: (error, _) => ErrorPanel(
                 error: error,
                 onRetry: () => ref.invalidate(paymentListProvider),
+                onUseSandbox: () =>
+                    ref.read(merchantModeProvider.notifier).setMode(MerchantMode.sandbox),
               ),
               data: (page) {
                 if (page.items.isEmpty) {

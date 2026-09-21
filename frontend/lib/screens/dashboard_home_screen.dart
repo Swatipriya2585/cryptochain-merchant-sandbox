@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../providers/merchant_mode_controller.dart';
 import '../providers/payments_providers.dart';
+import '../sandbox/merchant_mode.dart';
 import '../sandbox/models.dart';
 import '../sandbox/store.dart';
 import '../widgets/error_panel.dart';
@@ -42,6 +43,8 @@ class DashboardHomeScreen extends ConsumerWidget {
         error: (error, _) => ErrorPanel(
           error: error,
           onRetry: () => ref.invalidate(summaryProvider),
+          onUseSandbox: () =>
+              ref.read(merchantModeProvider.notifier).setMode(MerchantMode.sandbox),
         ),
         data: (data) {
           return RefreshIndicator(

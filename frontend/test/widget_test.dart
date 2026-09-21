@@ -1,6 +1,8 @@
 import 'package:cryptochain_merchant/config/app_mode.dart';
 import 'package:cryptochain_merchant/data/models/merchant_summary.dart';
+import 'package:cryptochain_merchant/providers/merchant_mode_controller.dart';
 import 'package:cryptochain_merchant/providers/payments_providers.dart';
+import 'package:cryptochain_merchant/sandbox/merchant_mode.dart';
 import 'package:cryptochain_merchant/screens/dashboard_home_screen.dart';
 import 'package:cryptochain_merchant/widgets/mode_banner.dart';
 import 'package:flutter/material.dart';
@@ -49,6 +51,8 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          merchantModeProvider.overrideWith(_LiveMode.new),
+          isSandboxProvider.overrideWith((ref) => false),
           summaryProvider.overrideWith((ref) async => summary),
         ],
         child: MaterialApp.router(routerConfig: router),
@@ -63,4 +67,9 @@ void main() {
     expect(find.text('Success rate'), findsOneWidget);
     expect(find.text('37.5%'), findsOneWidget);
   });
+}
+
+class _LiveMode extends MerchantModeController {
+  @override
+  MerchantMode build() => MerchantMode.live;
 }

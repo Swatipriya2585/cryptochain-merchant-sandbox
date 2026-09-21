@@ -10,15 +10,20 @@ class MerchantModeController extends Notifier<MerchantMode> {
   @override
   MerchantMode build() {
     Future.microtask(_restore);
-    return MerchantMode.live;
+    // Local / first-run default: simulated data, no backend required.
+    return MerchantMode.sandbox;
   }
 
   Future<void> _restore() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      if (prefs.getString(merchantModePrefsKey) == MerchantMode.sandbox.name) {
-        await setMode(MerchantMode.sandbox);
+      final stored = prefs.getString(merchantModePrefsKey);
+      // Never boot into LIVE from a cold start — that path needs the Node API
+      // and produced "Can't reach the CryptoChain server" on localhost.
+      if (stored == MerchantMode.live.name) {
+        return;
       }
+      await setMode(MerchantMode.sandbox);
     } catch (_) {}
   }
 

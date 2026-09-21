@@ -76,6 +76,20 @@ void main() {
     );
   });
 
+  testWidgets('first launch shows sandbox dashboard without a backend', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 2400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      const ProviderScope(child: MaterialApp(home: DashboardHomeScreen())),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining("Can't reach the CryptoChain server"), findsNothing);
+    expect(find.text('Wallet portfolio balance'), findsOneWidget);
+    expect(find.text('Unavailable'), findsNothing);
+  });
+
   testWidgets('sandbox dashboard shows simulated portfolio instead of Unavailable', (tester) async {
     await tester.binding.setSurfaceSize(const Size(1200, 2400));
     addTearDown(() => tester.binding.setSurfaceSize(null));
