@@ -1,0 +1,75 @@
+# CryptoChain merchant app
+
+Flutter merchant dashboard. **Sandbox Mode is the default** — simulated wallets, payments, and Smart Send with no backend, no RPC, and no real keys.
+
+## Run locally (this is the path you want)
+
+You only need Flutter. Do **not** start Postgres or the Node API.
+
+```bash
+cd frontend
+chmod +x run_localhost.sh
+./run_localhost.sh
+```
+
+That builds the web app (once) and serves it at `http://127.0.0.1:8080`. No Postgres, no Node API.
+
+Hot-reload during development:
+
+```bash
+./run_localhost.sh --dev
+```
+
+Or:
+
+```bash
+cd frontend
+flutter pub get
+flutter run -d chrome --web-port 8080
+```
+
+The app opens at `http://127.0.0.1:8080` in **SANDBOX**. You should see an orange banner and dollar amounts (portfolio, success rate). Switching to LIVE asks for confirmation because that path needs the API; if you still see “Can't reach the CryptoChain server”, click **Use Sandbox Mode** or **SANDBOX**.
+
+## Optional: LIVE against the Node API
+
+LIVE talks to `/api/v1` and needs the backend:
+
+```bash
+cd backend
+npm install
+npm run dev
+```
+
+Then in the app click **LIVE**, or compile with the sandbox env URL pointed at `http://127.0.0.1:4000`.
+
+```bash
+flutter run -d chrome --web-port 8080 \
+  --dart-define=SANDBOX_API_BASE_URL=http://127.0.0.1:4000 \
+  --dart-define=SANDBOX_MERCHANT_ID=merchant_sandbox_seed \
+  --dart-define=SANDBOX_API_KEY=sandbox_seed_frontend_key_aaaaaaaaaaaaaaaaaaaaaaaa
+```
+
+On an Android emulator use `http://10.0.2.2:4000` as the sandbox API URL.
+
+## Environment configs
+
+| Mode | What it uses |
+| --- | --- |
+| **SANDBOX** (default, top-nav pill) | In-memory mock store. No chain calls. |
+| LIVE + Sepolia env | Existing Prisma API (`assets/config/sandbox.env`) |
+| LIVE + mainnet env | `assets/config/live.env` — blocked in release unless `--dart-define=ENABLE_LIVE_MODE=true` |
+
+`--dart-define` values override dotenv. Settings can save merchant ID and API key locally.
+
+### Preventing accidental mainnet
+
+- Debug/profile: Settings can toggle the Sepolia vs mainnet *API target* (LIVE asks for confirmation).
+- Release: mainnet is **impossible** unless the binary was built with `--dart-define=ENABLE_LIVE_MODE=true`.
+- Never point LIVE at a wallet with real funds without `/infra/CUTOVER_CHECKLIST.md`.
+
+## Screens
+
+- Dashboard — sandbox mock cards, or live `/summary` when LIVE is selected
+- Wallets / Smart Send / invoices / customers — sandbox store
+- Payments — live API when LIVE, mock intents when SANDBOX
+- Settings — **Reset Sandbox Data** plus env credentials

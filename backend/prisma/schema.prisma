@@ -1,0 +1,113 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PaymentStatus {
+  PENDING
+  UNDERPAID
+  OVERPAID
+  CONFIRMED
+  EXPIRED
+}
+
+model Merchant {
+  id             String          @id
+  webhookUrl     String?
+  webhookSecret  String
+  /// SHA-256 hex of the plaintext API key (`sandbox_…` or `live_…`). Never store the raw key.
+  apiKeyHash     String          @unique
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  paymentIntents PaymentIntent[]
+  payouts        Payout[]
+}
+
+model PaymentIntent {
+  id                    String         @id @default(cuid())
+  merchantId            String
+  merchant              Merchant       @relation(fields: [merchantId], references: [id], onDelete: Restrict)
+  amountRequestedCrypto Decimal        @db.Decimal(36, 18)
+  currencyCrypto        String
+  expectedAddress       String
+  reference             String         @unique
+  status                PaymentStatus  @default(PENDING)
+  txHash                String?        @unique
+  txBlockNumber         Int?
+  confirmations         Int            @default(0)
+  receivedAmountCrypto  Decimal?       @db.Decimal(36, 18)
+  expiresAt             DateTime
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  webhookEvents         WebhookEvent[]
+  auditLogs             AuditLog[]
+  payout                Payout?
+
+  @@index([status])
+  @@index([expectedAddress])
+  @@index([merchantId])
+}
+
+model WebhookEvent {
+  id                    String        @id @default(cuid())
+  paymentIntentId       String
+  paymentIntent         PaymentIntent @relation(fields: [paymentIntentId], references: [id], onDelete: Cascade)
+  eventType             String
+  payload               Json
+  deliveredSuccessfully Boolean       @default(false)
+  attempts              Int           @default(0)
+  lastHttpStatus        Int?
+  lastError             String?
+  lastAttemptAt         DateTime?
+  nextAttemptAt         DateTime?
+  createdAt             DateTime      @default(now())
+
+  @@index([paymentIntentId])
+  @@index([deliveredSuccessfully])
+  @@index([eventType])
+}
+
+model AuditLog {
+  id              String        @id @default(cuid())
+  paymentIntentId String
+  paymentIntent   PaymentIntent @relation(fields: [paymentIntentId], references: [id], onDelete: Cascade)
+  fromStatus      String
+  toStatus        String
+  message         String
+  metadata        Json?
+  createdAt       DateTime      @default(now())
+
+  @@index([paymentIntentId])
+}
+
+
+enum PayoutStatus {
+  PENDING
+  PAID
+  FAILED
+}
+
+model Payout {
+  id                    String       @id @default(cuid())
+  paymentIntentId       String       @unique
+  paymentIntent         PaymentIntent @relation(fields: [paymentIntentId], references: [id], onDelete: Cascade)
+  merchantId            String
+  merchant              Merchant     @relation(fields: [merchantId], references: [id], onDelete: Restrict)
+  amountFiat            Decimal      @db.Decimal(18, 2)
+  currencyFiat          String       @default("INR")
+  status                PayoutStatus @default(PENDING)
+  stripePayoutId        String?      @unique
+  stripePaymentIntentId String?      @unique
+  lastStripeEventType   String?
+  simulated             Boolean      @default(true)
+  paidAt                DateTime?
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  @@index([merchantId])
+  @@index([status])
+}

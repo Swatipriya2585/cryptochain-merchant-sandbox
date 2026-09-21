@@ -1,0 +1,37 @@
+name: cryptochain-sandbox
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: cryptochain_sandbox_db
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: cryptochain
+      POSTGRES_PASSWORD: cryptochain
+      POSTGRES_DB: cryptochain_sandbox
+    volumes:
+      - cryptochain_sandbox_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cryptochain -d cryptochain_sandbox"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: cryptochain_sandbox_pgadmin
+    restart: unless-stopped
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: sandbox
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  cryptochain_sandbox_pgdata:
+    name: cryptochain_sandbox_pgdata
