@@ -1,10 +1,15 @@
 import 'package:go_router/go_router.dart';
 
 import 'screens/dashboard_home_screen.dart';
+import 'screens/developers_screen.dart';
+import 'screens/ledger_screens.dart';
+import 'screens/markets_screens.dart';
 import 'screens/payment_intent_create_screen.dart';
 import 'screens/payment_intent_detail_screen.dart';
 import 'screens/payment_intent_list_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/smart_send_screen.dart';
+import 'screens/wallets_screen.dart';
 import 'widgets/app_shell.dart';
 
 final appRouter = GoRouter(
@@ -16,6 +21,16 @@ final appRouter = GoRouter(
           path: '/',
           name: 'dashboard',
           builder: (context, state) => const DashboardHomeScreen(),
+        ),
+        GoRoute(
+          path: '/wallets',
+          name: 'wallets',
+          builder: (context, state) => const WalletsScreen(),
+        ),
+        GoRoute(
+          path: '/smart-send',
+          name: 'smart-send',
+          builder: (context, state) => const SmartSendScreen(),
         ),
         GoRoute(
           path: '/payments',
@@ -33,6 +48,50 @@ final appRouter = GoRouter(
           builder: (context, state) => PaymentIntentDetailScreen(
             paymentIntentId: state.pathParameters['id']!,
           ),
+        ),
+        GoRoute(
+          path: '/transactions',
+          builder: (context, state) => const TransactionsScreen(),
+        ),
+        GoRoute(
+          path: '/invoices',
+          builder: (context, state) => const InvoicesScreen(),
+        ),
+        GoRoute(
+          path: '/customers',
+          builder: (context, state) => const CustomersScreen(),
+        ),
+        GoRoute(
+          path: '/settlements',
+          builder: (context, state) => const SettlementsScreen(),
+        ),
+        GoRoute(
+          path: '/analytics',
+          builder: (context, state) => const AnalyticsScreen(),
+        ),
+        GoRoute(
+          path: '/coins',
+          builder: (context, state) => const CoinsScreen(),
+        ),
+        GoRoute(
+          path: '/converter',
+          builder: (context, state) => const ConverterScreen(),
+        ),
+        GoRoute(
+          path: '/token-of-day',
+          builder: (context, state) => const TokenOfDayScreen(),
+        ),
+        GoRoute(
+          path: '/swap',
+          builder: (context, state) => const SwapScreen(),
+        ),
+        GoRoute(
+          path: '/revenue',
+          builder: (context, state) => const RevenueScreen(),
+        ),
+        GoRoute(
+          path: '/developers',
+          builder: (context, state) => const DevelopersScreen(),
         ),
         GoRoute(
           path: '/settings',

@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../config/app_mode.dart';
 import '../providers/env_controller.dart';
+import '../providers/merchant_mode_controller.dart';
+import '../sandbox/merchant_mode.dart';
+import '../sandbox/store.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -144,6 +147,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   }
                 },
                 child: const Text('Save credentials'),
+              ),
+              const SizedBox(height: 32),
+              Text('Sandbox', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
+              Text(
+                'Resets mock wallets, payments, invoices, and Smart Send history. '
+                'Live Prisma data is not touched.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  await ref.read(sandboxStoreProvider.notifier).reset();
+                  await ref.read(merchantModeProvider.notifier).setMode(
+                    MerchantMode.sandbox,
+                  );
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Sandbox data reset')),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.restart_alt),
+                label: const Text('Reset Sandbox Data'),
               ),
             ],
           );

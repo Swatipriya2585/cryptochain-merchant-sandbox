@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'providers/merchant_mode_controller.dart';
 import 'router.dart';
 
 class CryptoChainApp extends ConsumerWidget {
@@ -10,8 +11,9 @@ class CryptoChainApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final sandbox = ref.watch(isSandboxProvider);
     final scheme = ColorScheme.fromSeed(
-      seedColor: const Color(0xFF0F4C5C),
+      seedColor: sandbox ? const Color(0xFFEF6C00) : const Color(0xFF0F4C5C),
       brightness: Brightness.light,
     );
 
