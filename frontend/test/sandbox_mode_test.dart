@@ -74,6 +74,16 @@ void main() {
       find.text("You're in Sandbox Mode — all data shown is simulated."),
       findsOneWidget,
     );
+
+    await tester.tap(find.text('LIVE'));
+    await tester.pumpAndSettle();
+    expect(find.text('Switch to LIVE?'), findsOneWidget);
+    await tester.tap(find.text('Stay in Sandbox'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text("You're in Sandbox Mode — all data shown is simulated."),
+      findsOneWidget,
+    );
   });
 
   testWidgets('first launch shows sandbox dashboard without a backend', (tester) async {
@@ -88,6 +98,20 @@ void main() {
     expect(find.textContaining("Can't reach the CryptoChain server"), findsNothing);
     expect(find.text('Wallet portfolio balance'), findsOneWidget);
     expect(find.text('Unavailable'), findsNothing);
+  });
+
+  testWidgets('stored LIVE preference still boots sandbox without a backend', (tester) async {
+    SharedPreferences.setMockInitialValues({merchantModePrefsKey: MerchantMode.live.name});
+    await tester.binding.setSurfaceSize(const Size(1200, 2400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      const ProviderScope(child: MaterialApp(home: DashboardHomeScreen())),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining("Can't reach the CryptoChain server"), findsNothing);
+    expect(find.text('Wallet portfolio balance'), findsOneWidget);
   });
 
   testWidgets('sandbox dashboard shows simulated portfolio instead of Unavailable', (tester) async {

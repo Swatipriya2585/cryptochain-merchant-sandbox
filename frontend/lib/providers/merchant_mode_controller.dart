@@ -7,6 +7,8 @@ import '../sandbox/store.dart';
 const merchantModePrefsKey = 'cryptochain.merchant_mode';
 
 class MerchantModeController extends Notifier<MerchantMode> {
+  var _userChoseMode = false;
+
   @override
   MerchantMode build() {
     Future.microtask(_restore);
@@ -15,19 +17,18 @@ class MerchantModeController extends Notifier<MerchantMode> {
   }
 
   Future<void> _restore() async {
+    // Always cold-start in SANDBOX so localhost works with no Node/Postgres.
+    // LIVE is opt-in from the top-nav pill for the current session only.
     try {
       final prefs = await SharedPreferences.getInstance();
-      final stored = prefs.getString(merchantModePrefsKey);
-      // Never boot into LIVE from a cold start — that path needs the Node API
-      // and produced "Can't reach the CryptoChain server" on localhost.
-      if (stored == MerchantMode.live.name) {
-        return;
-      }
-      await setMode(MerchantMode.sandbox);
+      await prefs.setString(merchantModePrefsKey, MerchantMode.sandbox.name);
     } catch (_) {}
+    if (_userChoseMode) return;
+    await setMode(MerchantMode.sandbox);
   }
 
   Future<void> setMode(MerchantMode mode) async {
+    _userChoseMode = true;
     state = mode;
     try {
       final prefs = await SharedPreferences.getInstance();

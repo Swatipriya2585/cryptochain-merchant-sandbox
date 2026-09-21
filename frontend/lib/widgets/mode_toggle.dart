@@ -25,7 +25,10 @@ class ModeToggle extends ConsumerWidget {
             label: 'LIVE',
             selected: mode == MerchantMode.live,
             selectedColor: const Color(0xFF2E7D32),
-            onTap: () => ref.read(merchantModeProvider.notifier).setMode(MerchantMode.live),
+            onTap: () {
+              if (mode == MerchantMode.live) return;
+              _confirmLive(context, ref);
+            },
           ),
           _Pill(
             label: 'SANDBOX',
@@ -36,6 +39,33 @@ class ModeToggle extends ConsumerWidget {
         ],
       ),
     );
+  }
+}
+
+Future<void> _confirmLive(BuildContext context, WidgetRef ref) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Switch to LIVE?'),
+      content: const Text(
+        'LIVE talks to the CryptoChain API (default http://127.0.0.1:4000). '
+        'Without that backend the dashboard cannot load. Stay in Sandbox to keep '
+        'using simulated data — no server required.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('Stay in Sandbox'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          child: const Text('Switch to LIVE'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed == true && context.mounted) {
+    await ref.read(merchantModeProvider.notifier).setMode(MerchantMode.live);
   }
 }
 
