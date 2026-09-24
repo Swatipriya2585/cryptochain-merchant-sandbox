@@ -77,18 +77,13 @@ class _DashboardViewData {
     required this.networkLabel,
     required this.confirmedVolume,
     required this.pendingCount,
-    required this.successRateLabel,
     required this.successSubtitle,
-    required this.avgConfirmationLabel,
     required this.portfolioLabel,
     required this.todayPaymentsLabel,
     required this.monthlyVolumeLabel,
     required this.feesSavedLabel,
-    required this.avgConfirmationCardLabel,
     required this.todaySpark,
     required this.monthlySpark,
-    required this.successSpark,
-    required this.pendingSettlements,
     required this.showImportBanner,
     required this.sandboxNotice,
     required this.totalPaymentIntents,
@@ -99,22 +94,13 @@ class _DashboardViewData {
       networkLabel: '${data.network} · ${data.totalPaymentIntents} payments',
       confirmedVolume: '${data.totalConfirmedVolumeCrypto} ${data.currencyCrypto}',
       pendingCount: '${data.pendingCount}',
-      successRateLabel: '${data.successRatePercent.toStringAsFixed(1)}%',
       successSubtitle: '${data.confirmedCount} of ${data.totalPaymentIntents} payments',
-      avgConfirmationLabel: data.avgConfirmationTimeSeconds == null
-          ? null
-          : _formatDuration(data.avgConfirmationTimeSeconds as int),
       portfolioLabel: 'Unavailable',
       todayPaymentsLabel: 'Unavailable',
       monthlyVolumeLabel: 'Unavailable',
       feesSavedLabel: 'Unavailable — no metric in backend',
-      avgConfirmationCardLabel: data.avgConfirmationTimeSeconds == null
-          ? 'Unavailable — no metric in backend'
-          : _formatDuration(data.avgConfirmationTimeSeconds as int),
       todaySpark: const [],
       monthlySpark: const [],
-      successSpark: const [],
-      pendingSettlements: const <LedgerEntry>[],
       showImportBanner: true,
       sandboxNotice: false,
       totalPaymentIntents: data.totalPaymentIntents as int,
@@ -123,23 +109,17 @@ class _DashboardViewData {
 
   factory _DashboardViewData.sandbox(SandboxState state) {
     final metrics = state.metrics;
-    final pending = state.settlements.where((item) => item.status == 'pending').toList();
     return _DashboardViewData(
       networkLabel: 'sandbox · ${metrics.totalPaymentIntents} payments',
       confirmedVolume: '${metrics.confirmedVolumeCrypto} ${metrics.currencyCrypto}',
       pendingCount: '${metrics.pendingCount}',
-      successRateLabel: '${metrics.successRatePercent.toStringAsFixed(1)}%',
       successSubtitle: '${metrics.confirmedCount} of ${metrics.totalPaymentIntents} payments',
-      avgConfirmationLabel: '${metrics.avgConfirmationSeconds.toStringAsFixed(1)}s',
       portfolioLabel: formatUsd(metrics.portfolioUsd),
       todayPaymentsLabel: formatUsd(metrics.todayPaymentsUsd),
       monthlyVolumeLabel: formatUsd(metrics.monthlyVolumeUsd),
       feesSavedLabel: formatUsd(metrics.feesSavedUsd),
-      avgConfirmationCardLabel: '${metrics.avgConfirmationSeconds.toStringAsFixed(1)}s',
       todaySpark: metrics.todaySparkline,
       monthlySpark: metrics.monthlySparkline,
-      successSpark: metrics.successSparkline,
-      pendingSettlements: pending,
       showImportBanner: false,
       sandboxNotice: true,
       totalPaymentIntents: metrics.totalPaymentIntents,
@@ -149,28 +129,16 @@ class _DashboardViewData {
   final String networkLabel;
   final String confirmedVolume;
   final String pendingCount;
-  final String successRateLabel;
   final String successSubtitle;
-  final String? avgConfirmationLabel;
   final String portfolioLabel;
   final String todayPaymentsLabel;
   final String monthlyVolumeLabel;
   final String feesSavedLabel;
-  final String avgConfirmationCardLabel;
   final List<double> todaySpark;
   final List<double> monthlySpark;
-  final List<double> successSpark;
-  final List<LedgerEntry> pendingSettlements;
   final bool showImportBanner;
   final bool sandboxNotice;
   final int totalPaymentIntents;
-
-  static String _formatDuration(int seconds) {
-    if (seconds < 60) return '${seconds}s';
-    final minutes = seconds ~/ 60;
-    final rest = seconds % 60;
-    return rest == 0 ? '${minutes}m' : '${minutes}m ${rest}s';
-  }
 }
 
 class _DashboardBody extends StatelessWidget {
@@ -224,19 +192,6 @@ class _DashboardBody extends StatelessWidget {
           subtitle: 'Waiting for on-chain confirmation',
           icon: Icons.hourglass_top_outlined,
         ),
-        _StatCard(
-          title: 'Success rate',
-          value: snapshot.successRateLabel,
-          subtitle: snapshot.successSubtitle,
-          icon: Icons.trending_up,
-        ),
-        if (snapshot.avgConfirmationLabel != null)
-          _StatCard(
-            title: 'Avg confirmation',
-            value: snapshot.avgConfirmationLabel!,
-            subtitle: 'Time from created to confirmed',
-            icon: Icons.timer_outlined,
-          ),
         _MetricCard(
           title: 'Wallet portfolio balance',
           value: snapshot.portfolioLabel,
@@ -254,39 +209,13 @@ class _DashboardBody extends StatelessWidget {
           subtitle: 'Trailing 30 days',
           sparkline: snapshot.monthlySpark,
         ),
-        if (snapshot.successSpark.isNotEmpty)
-          _MetricCard(
-            title: 'Success Rate trend',
-            value: snapshot.successRateLabel,
-            subtitle: snapshot.successSubtitle,
-            sparkline: snapshot.successSpark,
-          ),
         _MetricCard(
-          title: 'Fees Saved',
+          title: 'Fees saved vs banks',
           value: snapshot.feesSavedLabel,
           subtitle: snapshot.sandboxNotice
-              ? 'Versus unoptimized routing'
-              : 'Not exposed by the live summary API',
+              ? 'Versus traditional bank payments (SWIFT / ACH)'
+              : 'Estimated savings vs traditional banking rails',
         ),
-        _MetricCard(
-          title: 'Avg Confirmation',
-          value: snapshot.avgConfirmationCardLabel,
-          subtitle: 'Time from created to confirmed',
-        ),
-        const SizedBox(height: 8),
-        Text('Pending Settlements', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 8),
-        if (snapshot.pendingSettlements.isEmpty)
-          const Text('No pending settlements.')
-        else
-          for (final item in snapshot.pendingSettlements.take(3))
-            Card(
-              child: ListTile(
-                title: Text(item.title),
-                subtitle: Text(item.subtitle),
-                trailing: Text(formatUsd(item.amountUsd)),
-              ),
-            ),
         const SizedBox(height: 16),
         FilledButton.icon(
           onPressed: () => context.go('/payments/new'),

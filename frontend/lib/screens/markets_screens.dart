@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../providers/live_prices.dart';
 import '../providers/merchant_mode_controller.dart';
 import '../sandbox/models.dart';
 import '../sandbox/store.dart';
@@ -22,7 +23,6 @@ class AnalyticsScreen extends ConsumerWidget {
               children: [
                 _ChartCard(title: 'Payments today', value: formatUsd(metrics.todayPaymentsUsd), series: metrics.todaySparkline),
                 _ChartCard(title: 'Monthly volume', value: formatUsd(metrics.monthlyVolumeUsd), series: metrics.monthlySparkline),
-                _ChartCard(title: 'Success rate', value: '${metrics.successRatePercent}%', series: metrics.successSparkline),
               ],
             ),
     );
@@ -86,16 +86,55 @@ class _ConverterScreenState extends ConsumerState<ConverterScreen> {
   @override
   Widget build(BuildContext context) {
     final coins = ref.watch(sandboxStoreProvider).coins;
+    final live = ref.watch(livePricesProvider);
     final from = coins.firstWhere((c) => c.symbol == _from, orElse: () => coins.first);
     final to = coins.firstWhere((c) => c.symbol == _to, orElse: () => coins.last);
     final amount = double.tryParse(_amount.text) ?? 0;
-    final out = amount * from.usdPrice / to.usdPrice;
+    final liveFrom = live.value?.priceFor(_from);
+    final liveTo = live.value?.priceFor(_to);
+    final fromUsd = liveFrom ?? from.usdPrice;
+    final toUsd = liveTo ?? to.usdPrice;
+    final out = amount * fromUsd / toUsd;
+    final liveReady = liveFrom != null && liveTo != null;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Converter')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          live.when(
+            loading: () => const ListTile(
+              leading: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              title: Text('Fetching live conversion prices…'),
+            ),
+            error: (error, _) => ListTile(
+              leading: const Icon(Icons.wifi_off_outlined),
+              title: const Text('Live prices unavailable — using last sandbox quote'),
+              subtitle: Text('$error'),
+              trailing: IconButton(
+                tooltip: 'Retry',
+                onPressed: () => ref.invalidate(livePricesProvider),
+                icon: const Icon(Icons.refresh),
+              ),
+            ),
+            data: (prices) => ListTile(
+              leading: const Icon(Icons.stream, color: Color(0xFF2E7D32)),
+              title: const Text('Live conversion pricing'),
+              subtitle: Text(
+                'Updated ${formatTimestamp(prices.fetchedAt)} · CoinGecko',
+              ),
+              trailing: IconButton(
+                tooltip: 'Refresh',
+                onPressed: () => ref.invalidate(livePricesProvider),
+                icon: const Icon(Icons.refresh),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
           TextField(
             controller: _amount,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -115,6 +154,12 @@ class _ConverterScreenState extends ConsumerState<ConverterScreen> {
           ),
           const SizedBox(height: 16),
           Text('= ${out.toStringAsFixed(6)} $_to', style: Theme.of(context).textTheme.headlineSmall),
+          Text(
+            liveReady
+                ? '1 $_from = ${(fromUsd / toUsd).toStringAsFixed(6)} $_to'
+                : 'Using sandbox session prices until live feed loads.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
         ],
       ),
     );
@@ -145,91 +190,22 @@ class TokenOfDayScreen extends ConsumerWidget {
   }
 }
 
-class SwapScreen extends ConsumerStatefulWidget {
+class SwapScreen extends StatelessWidget {
   const SwapScreen({super.key});
 
   @override
-  ConsumerState<SwapScreen> createState() => _SwapScreenState();
-}
-
-class _SwapScreenState extends ConsumerState<SwapScreen> {
-  String? _walletId;
-  String _from = 'USDC';
-  String _to = 'ETH';
-  final _amount = TextEditingController(text: '25');
-  String? _result;
-
-  @override
-  void dispose() {
-    _amount.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final sandbox = ref.watch(isSandboxProvider);
-    final state = ref.watch(sandboxStoreProvider);
-    _walletId ??= state.wallets.firstOrNull?.id;
-
     return Scaffold(
       appBar: AppBar(title: const Text('Swap')),
-      body: !sandbox
-          ? const Center(child: Text('Swaps are mocked in SANDBOX only (no Uniswap/Jupiter calls).'))
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                DropdownButtonFormField<String>(
-                  initialValue: _walletId,
-                  items: [
-                    for (final wallet in state.wallets)
-                      DropdownMenuItem(value: wallet.id, child: Text(wallet.name)),
-                  ],
-                  onChanged: (value) => setState(() => _walletId = value),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _amount,
-                  decoration: const InputDecoration(labelText: 'Amount', border: OutlineInputBorder()),
-                ),
-                DropdownButtonFormField<String>(
-                  initialValue: _from,
-                  items: const [
-                    DropdownMenuItem(value: 'USDC', child: Text('USDC')),
-                    DropdownMenuItem(value: 'ETH', child: Text('ETH')),
-                    DropdownMenuItem(value: 'SOL', child: Text('SOL')),
-                  ],
-                  onChanged: (value) => setState(() => _from = value ?? _from),
-                ),
-                DropdownButtonFormField<String>(
-                  initialValue: _to,
-                  items: const [
-                    DropdownMenuItem(value: 'ETH', child: Text('ETH')),
-                    DropdownMenuItem(value: 'USDC', child: Text('USDC')),
-                    DropdownMenuItem(value: 'SOL', child: Text('SOL')),
-                  ],
-                  onChanged: (value) => setState(() => _to = value ?? _to),
-                ),
-                const SizedBox(height: 16),
-                FilledButton(
-                  onPressed: () async {
-                    final amount = double.tryParse(_amount.text) ?? 0;
-                    if (_walletId == null || amount <= 0) return;
-                    await ref.read(sandboxStoreProvider.notifier).mockSwap(
-                      walletId: _walletId!,
-                      fromSymbol: _from,
-                      toSymbol: _to,
-                      amount: amount,
-                    );
-                    setState(() => _result = 'Swapped $amount $_from → $_to (simulated)');
-                  },
-                  child: const Text('Swap (simulated)'),
-                ),
-                if (_result != null) ...[
-                  const SizedBox(height: 12),
-                  Text(_result!),
-                ],
-              ],
-            ),
+      body: const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text(
+            'No swap. Token conversion uses Converter; sending uses Send token.',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -253,7 +229,7 @@ class RevenueScreen extends ConsumerWidget {
                 const SizedBox(height: 16),
                 Sparkline(values: metrics.monthlySparkline, height: 72),
                 const SizedBox(height: 16),
-                Text('Fees saved ${formatUsd(metrics.feesSavedUsd)}'),
+                Text('Fees saved vs traditional banking ${formatUsd(metrics.feesSavedUsd)}'),
               ],
             ),
     );

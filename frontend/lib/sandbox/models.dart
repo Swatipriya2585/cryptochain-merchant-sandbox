@@ -4,6 +4,14 @@ final usdFormat = NumberFormat.currency(symbol: r'$', decimalDigits: 2);
 
 String formatUsd(double value) => usdFormat.format(value);
 
+String formatTimestamp(DateTime value) {
+  return DateFormat('MMM d, y · h:mm:ss a').format(value.toLocal());
+}
+
+String formatDate(DateTime value) => DateFormat('MMM d, y').format(value.toLocal());
+
+String formatTime(DateTime value) => DateFormat('h:mm:ss a').format(value.toLocal());
+
 class MerchantWallet {
   const MerchantWallet({
     required this.id,

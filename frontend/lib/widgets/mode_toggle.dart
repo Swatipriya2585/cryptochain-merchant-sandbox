@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../config/app_mode.dart';
+import '../providers/auth_controller.dart';
 import '../providers/env_controller.dart';
 import '../providers/merchant_mode_controller.dart';
 import '../sandbox/merchant_mode.dart';
@@ -151,6 +152,12 @@ class MerchantChrome extends ConsumerWidget {
                   ),
                   const Spacer(),
                   const ModeToggle(),
+                  TextButton(
+                    onPressed: () async {
+                      await authController.logout();
+                    },
+                    child: const Text('Sign out'),
+                  ),
                 ],
               ),
             ),

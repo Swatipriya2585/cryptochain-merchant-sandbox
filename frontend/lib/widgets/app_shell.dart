@@ -24,7 +24,6 @@ const _destinations = [
   _Dest('/coins', Icons.currency_bitcoin, 'Coins'),
   _Dest('/converter', Icons.currency_exchange, 'Converter'),
   _Dest('/token-of-day', Icons.star_outline, 'Token of Day'),
-  _Dest('/swap', Icons.swap_vert, 'Swap'),
   _Dest('/revenue', Icons.trending_up, 'Revenue'),
   _Dest('/developers', Icons.vpn_key_outlined, 'Developers'),
   _Dest('/settings', Icons.settings_outlined, 'Settings'),

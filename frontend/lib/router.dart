@@ -1,19 +1,40 @@
 import 'package:go_router/go_router.dart';
 
+import 'providers/auth_controller.dart';
 import 'screens/dashboard_home_screen.dart';
 import 'screens/developers_screen.dart';
 import 'screens/ledger_screens.dart';
+import 'screens/login_screen.dart';
 import 'screens/markets_screens.dart';
 import 'screens/payment_intent_create_screen.dart';
 import 'screens/payment_intent_detail_screen.dart';
 import 'screens/payment_intent_list_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/signup_screen.dart';
 import 'screens/smart_send_screen.dart';
 import 'screens/wallets_screen.dart';
 import 'widgets/app_shell.dart';
 
 final appRouter = GoRouter(
+  refreshListenable: authController,
+  redirect: (context, state) {
+    final loggingIn =
+        state.matchedLocation == '/login' || state.matchedLocation == '/signup';
+    if (!authController.isAuthenticated && !loggingIn) return '/login';
+    if (authController.isAuthenticated && loggingIn) return '/';
+    return null;
+  },
   routes: [
+    GoRoute(
+      path: '/login',
+      name: 'login',
+      builder: (context, state) => const LoginScreen(),
+    ),
+    GoRoute(
+      path: '/signup',
+      name: 'signup',
+      builder: (context, state) => const SignupScreen(),
+    ),
     ShellRoute(
       builder: (context, state, child) => AppShell(child: child),
       routes: [
