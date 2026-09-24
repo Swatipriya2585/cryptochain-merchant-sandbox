@@ -167,15 +167,15 @@ class _WalletCard extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 FilledButton.tonalIcon(
-                  onPressed: () => _send(context, ref),
+                  onPressed: () => _sendToken(context, ref),
                   icon: const Icon(Icons.north_east),
-                  label: const Text('Send money'),
+                  label: const Text('Send token'),
                 ),
                 const SizedBox(height: 8),
                 FilledButton.icon(
-                  onPressed: () => _receive(context),
+                  onPressed: () => _receiveToken(context),
                   icon: const Icon(Icons.south_west),
-                  label: const Text('Receive money'),
+                  label: const Text('Receive token'),
                 ),
                 const SizedBox(height: 8),
                 OutlinedButton.icon(
@@ -212,7 +212,7 @@ class _WalletCard extends ConsumerWidget {
     }
   }
 
-  Future<void> _send(BuildContext context, WidgetRef ref) async {
+  Future<void> _sendToken(BuildContext context, WidgetRef ref) async {
     final amount = TextEditingController(text: '10');
     final recipient = TextEditingController(
       text: wallet.chainFamily == 'solana' ? 'So1SANDBOXrecipient0001' : '0xSANDBOXrecipient0001',
@@ -223,7 +223,7 @@ class _WalletCard extends ConsumerWidget {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Send money'),
+          title: const Text('Send token'),
           content: StatefulBuilder(
             builder: (context, setLocal) {
               return Column(
@@ -270,7 +270,7 @@ class _WalletCard extends ConsumerWidget {
     );
   }
 
-  Future<void> _receive(BuildContext context) async {
+  Future<void> _receiveToken(BuildContext context) async {
     await showDialog<void>(
       context: context,
       useRootNavigator: true,
@@ -280,7 +280,7 @@ class _WalletCard extends ConsumerWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Receive money', style: Theme.of(context).textTheme.titleLarge),
+              Text('Receive token', style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 16),
               SizedBox(
                 width: 180,

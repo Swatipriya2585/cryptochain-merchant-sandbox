@@ -132,7 +132,9 @@ void main() {
     expect(find.text('Wallet portfolio balance'), findsOneWidget);
     expect(find.text('Unavailable'), findsNothing);
     expect(find.text('Unavailable — no metric in backend'), findsNothing);
-    expect(find.text('97.8%'), findsWidgets);
+    expect(find.text('Fees saved vs banks'), findsOneWidget);
+    expect(find.text('Success rate'), findsNothing);
+    expect(find.text('Pending Settlements'), findsNothing);
     expect(
       find.text('Import your real wallet address to receive mainnet payments'),
       findsNothing,
@@ -183,8 +185,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Sandbox Treasury'), findsWidgets);
-    await tester.ensureVisible(find.text('Receive money'));
-    await tester.tap(find.text('Receive money'));
+    await tester.ensureVisible(find.text('Receive token'));
+    await tester.tap(find.text('Receive token'));
     await tester.pumpAndSettle();
     expect(find.textContaining('0xSANDBOX'), findsWidgets);
     expect(find.text('Copy address'), findsOneWidget);

@@ -36,8 +36,15 @@ class SettlementsScreen extends ConsumerWidget {
                   Card(
                     child: ListTile(
                       title: Text(item.title),
-                      subtitle: Text('${item.subtitle} · ${item.status}'),
+                      subtitle: Text(
+                        [
+                          item.subtitle,
+                          formatTimestamp(item.createdAt),
+                          if (item.status.toLowerCase() != 'pending') item.status,
+                        ].join(' · '),
+                      ),
                       trailing: Text(formatUsd(item.amountUsd)),
+                      onTap: () => _showSettlementDetails(context, item),
                     ),
                   ),
               ],
@@ -160,6 +167,34 @@ class _LedgerList extends ConsumerWidget {
             ),
     );
   }
+}
+
+Future<void> _showSettlementDetails(BuildContext context, LedgerEntry item) async {
+  await showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(item.title),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(item.subtitle),
+          const SizedBox(height: 8),
+          Text('Amount: ${formatUsd(item.amountUsd)}'),
+          Text('Date: ${formatDate(item.createdAt)}'),
+          Text('Time: ${formatTime(item.createdAt)}'),
+          if (item.counterparty != null) Text('Counterparty: ${item.counterparty}'),
+          if (item.txHash != null) SelectableText('Tx: ${item.txHash}'),
+        ],
+      ),
+      actions: [
+        FilledButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Close'),
+        ),
+      ],
+    ),
+  );
 }
 
 Future<void> _editInvoice(BuildContext context, WidgetRef ref, {LedgerEntry? existing}) async {
