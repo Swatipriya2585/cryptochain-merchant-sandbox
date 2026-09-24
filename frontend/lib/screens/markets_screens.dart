@@ -90,8 +90,8 @@ class _ConverterScreenState extends ConsumerState<ConverterScreen> {
     final from = coins.firstWhere((c) => c.symbol == _from, orElse: () => coins.first);
     final to = coins.firstWhere((c) => c.symbol == _to, orElse: () => coins.last);
     final amount = double.tryParse(_amount.text) ?? 0;
-    final liveFrom = live.valueOrNull?.priceFor(_from);
-    final liveTo = live.valueOrNull?.priceFor(_to);
+    final liveFrom = live.value?.priceFor(_from);
+    final liveTo = live.value?.priceFor(_to);
     final fromUsd = liveFrom ?? from.usdPrice;
     final toUsd = liveTo ?? to.usdPrice;
     final out = amount * fromUsd / toUsd;
